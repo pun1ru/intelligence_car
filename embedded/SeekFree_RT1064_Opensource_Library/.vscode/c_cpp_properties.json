@@ -1,0 +1,86 @@
+{
+  "configurations": [
+    {
+      "name": "RT1064 Keil",
+      "includePath": [
+        "${workspaceFolder}/project/user/inc",
+        "${workspaceFolder}/libraries/Freertos",
+        "${workspaceFolder}/libraries/Freertos/include",
+        "${workspaceFolder}/libraries/Freertos/portable/GCC/ARM_CM7/r0p1",
+        "${workspaceFolder}/libraries/Freertos/osa",
+        "${workspaceFolder}/libraries/sdk/CMSIS/Include",
+        "${workspaceFolder}/libraries/sdk/CMSIS/DSP/Include",
+        "${workspaceFolder}/libraries/sdk/CMSIS/DSP/PrivateInclude",
+        "${workspaceFolder}/libraries/sdk/startup/mdk",
+        "${workspaceFolder}/libraries/sdk/deceive",
+        "${workspaceFolder}/libraries/sdk/drives",
+        "${workspaceFolder}/libraries/sdk/xip",
+        "${workspaceFolder}/libraries/sdk/utilities",
+        "${workspaceFolder}/libraries/sdk/utilities/debug_console",
+        "${workspaceFolder}/libraries/sdk/utilities/str",
+        "${workspaceFolder}/libraries/sdk/cmsis_drivers",
+        "${workspaceFolder}/libraries/sdk/CMSIS/Driver/Include",
+        "${workspaceFolder}/libraries/sdk/components/lists",
+        "${workspaceFolder}/libraries/sdk/components/osa",
+        "${workspaceFolder}/libraries/sdk/components/serial_manager",
+        "${workspaceFolder}/libraries/sdk/components/uart",
+        "${workspaceFolder}/libraries/sdk/board",
+        "${workspaceFolder}/libraries/components/fatfs/source",
+        "${workspaceFolder}/libraries/components/fatfs/source/fsl_sd_disk",
+        "${workspaceFolder}/libraries/components/sdmmc",
+        "${workspaceFolder}/libraries/components/sdmmc/common",
+        "${workspaceFolder}/libraries/components/sdmmc/host/usdhc",
+        "${workspaceFolder}/libraries/components/sdmmc/osa",
+        "${workspaceFolder}/libraries/components/sdmmc/sd",
+        "${workspaceFolder}/libraries/components/usb/device",
+        "${workspaceFolder}/libraries/components/usb/include",
+        "${workspaceFolder}/libraries/components/usb/phy",
+        "${workspaceFolder}/libraries/components/usb/usb_cdc_adapter",
+        "${workspaceFolder}/libraries/zf_common",
+        "${workspaceFolder}/libraries/zf_driver",
+        "${workspaceFolder}/libraries/zf_device",
+        "${workspaceFolder}/libraries/zf_components",
+        "${workspaceFolder}/libraries/myAlgorithm",
+        "${workspaceFolder}/libraries/myAlgorithm/EKF",
+        "${workspaceFolder}/libraries/myAlgorithm/kalman",
+        "${workspaceFolder}/libraries/myAlgorithm/lqr",
+        "${workspaceFolder}/libraries/myAlgorithm/pid",
+        "${workspaceFolder}/libraries/myAlgorithm/madgwick",
+        "${workspaceFolder}/libraries/myAlgorithm/math"
+      ],
+      "defines": [
+        "CPU_MIMXRT1064DVL6A",
+        "SKIP_SYSCLK_INIT",
+        "XIP_EXTERNAL_FLASH=1",
+        "XIP_BOOT_HEADER_DCD_ENABLE=1",
+        "XIP_BOOT_HEADER_ENABLE=1",
+        "PRINTF_FLOAT_ENABLE=1",
+        "SCANF_FLOAT_ENABLE=1",
+        "PRINTF_ADVANCED_ENABLE=1",
+        "SCANF_ADVANCED_ENABLE=1",
+        "FSL_DRIVER_TRANSFER_DOUBLE_WEAK_IRQ=0",
+        "USB_STACK_BM",
+        "SDK_OS_FREE_RTOS",
+        "DEBUG",
+        "MCUXPRESSO_SDK",
+        "SD_ENABLED"
+      ],
+      "compilerArgs": [
+        "--target=arm-arm-none-eabi",
+        "-mcpu=cortex-m7",
+        "-mthumb"
+      ],
+      "cStandard": "c99",
+      "cppStandard": "c++17",
+      "compilerPath": "C:/Keil_v5/ARM/ARMCLANG/bin/armclang.exe",
+      "intelliSenseMode": "windows-clang-arm",
+      "browse": {
+        "path": [
+          "${workspaceFolder}"
+        ],
+        "limitSymbolsToIncludedHeaders": true
+      }
+    }
+  ],
+  "version": 4
+}
