@@ -26,7 +26,7 @@
   C:\Keil_v5\ARM\ARMCLANG\Bin\..\include\stdarg.h \
   ..\..\libraries\zf_common\zf_common_interrupt.h \
   ..\..\libraries\zf_driver\zf_driver_romapi.h \
-  ..\..\libraries\sdk\xip\EVKMIMXRT1064_FLEXSPI_NOR_CONFIG.h \
+  ..\..\libraries\sdk\xip\evkmimxrt1064_flexspi_nor_config.h \
   ..\..\libraries\sdk\drives\fsl_rtwdog.h \
   ..\..\libraries\sdk\drives\fsl_wdog.h \
   ..\..\libraries\zf_driver\zf_driver_flash.h

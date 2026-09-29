@@ -21,6 +21,6 @@
   C:\Keil_v5\ARM\ARMCLANG\Bin\..\include\stdlib.h \
   C:\Keil_v5\ARM\ARMCLANG\Bin\..\include\stddef.h \
   ..\..\libraries\sdk\drives\fsl_common_arm.h \
-  ..\..\libraries\sdk\xip\EVKMIMXRT1064_FLEXSPI_NOR_CONFIG.h \
+  ..\..\libraries\sdk\xip\evkmimxrt1064_flexspi_nor_config.h \
   ..\..\libraries\sdk\drives\fsl_rtwdog.h \
   ..\..\libraries\sdk\drives\fsl_wdog.h

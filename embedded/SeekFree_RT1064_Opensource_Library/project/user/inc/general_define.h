@@ -1,0 +1,25 @@
+#ifndef _GENERAL_DEFINE_H_
+#define _GENERAL_DEFINE_H_
+
+#define STATE_TASK_PRIORITY 1
+#define DECISION_TASK_PRIORITY 1
+#define ESTIMATE_TASK_PRIORITY 1
+#define CONTROL_TASK_PRIORITY 1
+#define RECEIVE_TASK_PRIORITY 1
+#define SEND_TASK_PRIORITY 1
+
+#define STATE_TASK_STACK_SIZE 512
+#define DECISION_TASK_STACK_SIZE 512  
+#define ESTIMATE_TASK_STACK_SIZE 1024
+#define CONTROL_TASK_STACK_SIZE 1024
+#define RECEIVE_TASK_STACK_SIZE 1024
+#define SEND_TASK_STACK_SIZE 1024
+
+#define STATE_TASK_NAME "state_task"
+#define DECISION_TASK_NAME "decision_task"
+#define ESTIMATE_TASK_NAME "estimate_task"
+#define CONTROL_TASK_NAME "control_task"
+#define RECEIVE_TASK_NAME "receive_task"
+#define SEND_TASK_NAME "send_task"
+
+#endif 

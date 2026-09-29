@@ -1,11 +1,11 @@
 ./objects/lqr.o: ..\..\libraries\myAlgorithm\lqr\lqr.c \
   ..\..\libraries\myAlgorithm\lqr\lqr.h \
+  C:\Keil_v5\ARM\ARMCLANG\Bin\..\include\stdint.h \
   C:\Keil_v5\ARM\ARMCLANG\Bin\..\include\math.h \
   C:\Keil_v5\ARM\ARMCLANG\Bin\..\include\stdlib.h \
   ..\..\libraries\sdk\CMSIS\DSP\Include\arm_math.h \
   ..\..\libraries\sdk\CMSIS\DSP\Include\arm_math_types.h \
   ..\..\libraries\sdk\CMSIS\Include\cmsis_compiler.h \
-  C:\Keil_v5\ARM\ARMCLANG\Bin\..\include\stdint.h \
   ..\..\libraries\sdk\CMSIS\Include\cmsis_armclang.h \
   C:\Keil_v5\ARM\ARMCLANG\Bin\..\include\arm_compat.h \
   C:\Keil_v5\ARM\ARMCLANG\Bin\..\include\arm_acle.h \

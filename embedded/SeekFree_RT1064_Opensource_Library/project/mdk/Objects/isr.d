@@ -54,7 +54,7 @@
   ..\..\libraries\sdk\drives\fsl_lpuart.h \
   ..\..\libraries\zf_driver\zf_driver_csi.h \
   ..\..\libraries\zf_driver\zf_driver_romapi.h \
-  ..\..\libraries\sdk\xip\EVKMIMXRT1064_FLEXSPI_NOR_CONFIG.h \
+  ..\..\libraries\sdk\xip\evkmimxrt1064_flexspi_nor_config.h \
   ..\..\libraries\sdk\drives\fsl_rtwdog.h \
   ..\..\libraries\sdk\drives\fsl_wdog.h \
   ..\..\libraries\zf_driver\zf_driver_flexio_csi.h \
