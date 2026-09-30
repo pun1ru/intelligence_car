@@ -13,6 +13,14 @@ TaskHandle_t debugTaskHandle;
 
 static volatile uint8 buzzer_fast_running;
 
+static void motor_init(void)
+{
+    gpio_init(MOTOR_LEFT_DIR, GPO, GPIO_LOW, GPO_PUSH_PULL);
+    gpio_init(MOTOR_RIGHT_DIR, GPO, GPIO_LOW, GPO_PUSH_PULL);
+    pwm_init(MOTOR_LEFT_PWM, MOTOR_PWM_FREQUENCY_HZ, 0U);
+    pwm_init(MOTOR_RIGHT_PWM, MOTOR_PWM_FREQUENCY_HZ, 0U);
+}
+
 void buzzer_init(void)
 {
     gpio_init(B11, GPO, GPIO_LOW, GPO_PUSH_PULL);
@@ -81,6 +89,8 @@ void initial_task(void *pvParameters)
     uart_init(UART_8, 115200U, UART8_TX_D16, UART8_RX_D17);
     imu_init_status = imu660rc_init(IMU660RC_QUARTERNION_DISABLE);
     g_imu_receive_data.imu_ready = (imu_init_status == 0U) ? 1U : 0U;
+    key_init(CONTROL_TASK_PERIOD_MS);
+    motor_init();
     encoder_quad_init(ENCODER_LEFT_INDEX, ENCODER_LEFT_CH1, ENCODER_LEFT_CH2);
     encoder_quad_init(ENCODER_RIGHT_INDEX, ENCODER_RIGHT_CH1, ENCODER_RIGHT_CH2);
     encoder_clear_count(ENCODER_LEFT_INDEX);
