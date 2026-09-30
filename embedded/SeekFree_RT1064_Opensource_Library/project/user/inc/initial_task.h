@@ -25,4 +25,5 @@ void estimate_task(void *pvParameters);
 void control_task(void *pvParameters);
 void receive_task(void *pvParameters);
 void send_task(void *pvParameters);
+void debug_task(void *pvParameters);
 #endif 

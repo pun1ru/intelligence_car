@@ -9,6 +9,7 @@ TaskHandle_t estimateTaskHnadle;
 TaskHandle_t controlTaskHandle;
 TaskHandle_t receiveTaskHandel;
 TaskHandle_t sendTaskHandle;
+TaskHandle_t debugTaskHandle;
 
 static volatile uint8 buzzer_fast_running;
 
@@ -93,6 +94,7 @@ void initial_task(void *pvParameters)
     xTaskCreate(control_task, "control_task", CONTROL_TASK_STACK_SIZE, NULL, CONTROL_TASK_PRIORITY, &controlTaskHandle);
     xTaskCreate(receive_task, "receive_task", RECEIVE_TASK_STACK_SIZE, NULL, RECEIVE_TASK_PRIORITY, &receiveTaskHandel);
     xTaskCreate(send_task, "send_task", SEND_TASK_STACK_SIZE, NULL, SEND_TASK_PRIORITY, &sendTaskHandle);
+    xTaskCreate(debug_task, DEBUG_TASK_NAME, DEBUG_TASK_STACK_SIZE, NULL, DEBUG_TASK_PRIORITY, &debugTaskHandle);
     taskEXIT_CRITICAL();
 
     task_metrics_end(TASK_METRIC_INITIAL, metric_start);

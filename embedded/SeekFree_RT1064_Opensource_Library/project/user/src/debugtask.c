@@ -1,10 +1,47 @@
 #include "string.h"
 #include "MIMXRT1064.h"
+#include "zf_common_headfile.h"
+#include "general_define.h"
+#include "receive_task.h"
 #include "task_metrics.h"
 
 extern uint32_t SystemCoreClock;
 
 task_runtime_metrics_t g_task_runtime;
+
+void debug_task(void *pvParameters)
+{
+    TickType_t last_wake_tick = xTaskGetTickCount();
+
+    (void)pvParameters;
+
+    tft180_init();
+    tft180_set_font(TFT180_8X16_FONT);
+    tft180_set_color(RGB565_RED, RGB565_WHITE);
+    tft180_show_string(0, 0, "IMU ANGLE");
+    tft180_show_string(0, 16, "Roll:");
+    tft180_show_string(0, 32, "Pitch:");
+    tft180_show_string(0, 48, "Yaw:");
+    tft180_show_string(0, 64, "EncL:");
+    tft180_show_string(0, 80, "EncR:");
+
+    for (;;)
+    {
+        float roll = g_imu_receive_data.roll;
+        float pitch = g_imu_receive_data.pitch;
+        float yaw = g_imu_receive_data.yaw;
+        int16 left_count = g_encoder_receive_data.left_count;
+        int16 right_count = g_encoder_receive_data.right_count;
+
+        tft180_show_float(48, 16, roll, 3, 1);
+        tft180_show_float(48, 32, pitch, 3, 1);
+        tft180_show_float(48, 48, yaw, 3, 1);
+        tft180_show_int(48, 64, left_count, 6);
+        tft180_show_int(48, 80, right_count, 6);
+
+        vTaskDelayUntil(&last_wake_tick, pdMS_TO_TICKS(DEBUG_TASK_PERIOD_MS));
+    }
+}
 
 void task_metrics_init(void)
 {
