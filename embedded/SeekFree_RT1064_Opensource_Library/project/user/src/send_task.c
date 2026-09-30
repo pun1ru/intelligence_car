@@ -8,8 +8,6 @@ void send_task(void *pvParameters)
     TickType_t last_wake_tick = xTaskGetTickCount();
 
     (void)pvParameters;
-    uart_init(UART_8, 115200U, UART8_TX_D16, UART8_RX_D17);
-
     for (;;)
     {
         uint32_t metric_start = task_metrics_begin();

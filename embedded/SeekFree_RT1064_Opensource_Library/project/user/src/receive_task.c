@@ -7,6 +7,7 @@ volatile imu_receive_data_t g_imu_receive_data;
 SemaphoreHandle_t g_imu_data_ready_sem;
 volatile imu_gyro_calibration_t g_imu_gyro_calibration;
 volatile imu_accel_calibration_t g_imu_accel_calibration;
+volatile encoder_receive_data_t g_encoder_receive_data;
 
 void imu_accel_noise_calibrate(void)
 {
@@ -206,12 +207,8 @@ void imu_gyro_noise_calibrate(void)
 void receive_task(void *pvParameters)
 {
     TickType_t last_wake_tick = xTaskGetTickCount();
-    uint8 imu_init_status;
 
     (void)pvParameters;
-
-    imu_init_status = imu660rc_init(IMU660RC_QUARTERNION_DISABLE);
-    g_imu_receive_data.imu_ready = (imu_init_status == 0U) ? 1U : 0U;
 
     for (;;)
     {
@@ -241,6 +238,9 @@ void receive_task(void *pvParameters)
                 (void)xSemaphoreGive(g_imu_data_ready_sem);
             }
         }
+
+        g_encoder_receive_data.left_count = encoder_get_count(ENCODER_LEFT_INDEX);
+        g_encoder_receive_data.right_count = encoder_get_count(ENCODER_RIGHT_INDEX);
 
         task_metrics_end(TASK_METRIC_RECEIVE, metric_start);
         vTaskDelayUntil(&last_wake_tick, pdMS_TO_TICKS(RECEIVE_TASK_PERIOD_MS));

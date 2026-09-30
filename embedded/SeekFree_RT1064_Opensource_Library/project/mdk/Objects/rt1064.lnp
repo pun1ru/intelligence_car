@@ -8,7 +8,7 @@
 ".\objects\receive_task.o"
 ".\objects\send_task.o"
 ".\objects\state_task.o"
-".\objects\task_metrics.o"
+".\objects\debugtask.o"
 ".\objects\zf_common_clock.o"
 ".\objects\zf_common_debug.o"
 ".\objects\zf_common_fifo.o"

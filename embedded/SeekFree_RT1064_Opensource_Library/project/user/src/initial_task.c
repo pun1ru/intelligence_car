@@ -72,10 +72,18 @@ void buzzer_beep_fast(void) { buzzer_play(BUZZER_MODE_FAST_CONTINUOUS); }
 void initial_task(void *pvParameters)
 {
     uint32_t metric_start;
+    uint8 imu_init_status;
 
     (void)pvParameters;
     metric_start = task_metrics_begin();
     buzzer_beep_once();
+    uart_init(UART_8, 115200U, UART8_TX_D16, UART8_RX_D17);
+    imu_init_status = imu660rc_init(IMU660RC_QUARTERNION_DISABLE);
+    g_imu_receive_data.imu_ready = (imu_init_status == 0U) ? 1U : 0U;
+    encoder_quad_init(ENCODER_LEFT_INDEX, ENCODER_LEFT_CH1, ENCODER_LEFT_CH2);
+    encoder_quad_init(ENCODER_RIGHT_INDEX, ENCODER_RIGHT_CH1, ENCODER_RIGHT_CH2);
+    encoder_clear_count(ENCODER_LEFT_INDEX);
+    encoder_clear_count(ENCODER_RIGHT_INDEX);
     g_imu_data_ready_sem = xSemaphoreCreateBinary();
 
     taskENTER_CRITICAL();

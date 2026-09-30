@@ -48,10 +48,17 @@ typedef struct
     float noise_stddev_norm[3];
 } imu_accel_calibration_t;
 
+typedef struct
+{
+    int16_t left_count;
+    int16_t right_count;
+} encoder_receive_data_t;
+
 extern volatile imu_receive_data_t g_imu_receive_data;
 extern SemaphoreHandle_t g_imu_data_ready_sem;
 extern volatile imu_gyro_calibration_t g_imu_gyro_calibration;
 extern volatile imu_accel_calibration_t g_imu_accel_calibration;
+extern volatile encoder_receive_data_t g_encoder_receive_data;
 
 void imu_gyro_noise_calibrate(void);
 void imu_accel_noise_calibrate(void);

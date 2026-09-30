@@ -180,6 +180,11 @@
           <WinNumber>1</WinNumber>
           <ItemText>g_imu_accel_calibration</ItemText>
         </Ww>
+        <Ww>
+          <count>5</count>
+          <WinNumber>1</WinNumber>
+          <ItemText>g_encoder_receive_data,0x0A</ItemText>
+        </Ww>
       </WatchWindow1>
       <WatchWindow2>
         <Ww>
@@ -377,8 +382,8 @@
       <tvExp>0</tvExp>
       <tvExpOptDlg>0</tvExpOptDlg>
       <bDave2>0</bDave2>
-      <PathWithFileName>..\user\src\task_metrics.c</PathWithFileName>
-      <FilenameWithoutPath>task_metrics.c</FilenameWithoutPath>
+      <PathWithFileName>..\user\src\debugtask.c</PathWithFileName>
+      <FilenameWithoutPath>debugtask.c</FilenameWithoutPath>
       <RteFlg>0</RteFlg>
       <bShared>0</bShared>
     </File>

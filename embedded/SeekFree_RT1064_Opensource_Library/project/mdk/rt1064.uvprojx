@@ -431,9 +431,9 @@
               <FilePath>..\user\src\state_task.c</FilePath>
             </File>
             <File>
-              <FileName>task_metrics.c</FileName>
+              <FileName>debugtask.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\user\src\task_metrics.c</FilePath>
+              <FilePath>..\user\src\debugtask.c</FilePath>
             </File>
           </Files>
         </Group>
