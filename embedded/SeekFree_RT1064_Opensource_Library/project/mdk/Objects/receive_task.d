@@ -121,5 +121,6 @@
   ..\..\libraries\components\sdmmc\common\fsl_sdmmc_spec.h \
   ..\..\libraries\components\sdmmc\sdmmc_config.h \
   ..\..\libraries\sdk\board\clock_config.h ..\user\inc\general_include.h \
-  ..\user\inc\initial_task.h ..\user\inc\task_metrics.h \
-  ..\user\inc\receive_task.h
+  ..\user\inc\general_define.h ..\user\inc\initial_task.h \
+  ..\user\inc\task_metrics.h ..\user\inc\receive_task.h \
+  C:\Keil_v5\ARM\ARMCLANG\Bin\..\include\math.h

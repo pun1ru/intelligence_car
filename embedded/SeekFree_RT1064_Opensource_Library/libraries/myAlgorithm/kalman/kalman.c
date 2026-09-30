@@ -169,8 +169,15 @@ void Kalman_Filter_Init(KalmanFilter_t *kf, uint8_t xhatSize, uint8_t uSize, uin
     memset(kf->FilteredValue, 0, sizeof_float * xhatSize);
     kf->MeasuredVector = (float *)user_malloc(sizeof_float * zSize);
     memset(kf->MeasuredVector, 0, sizeof_float * zSize);
-    kf->ControlVector = (float *)user_malloc(sizeof_float * uSize);
-    memset(kf->ControlVector, 0, sizeof_float * uSize);
+    /* A zero-dimensional control input has no storage to allocate.  Calling
+     * pvPortMalloc(0) returns NULL and invokes the malloc-failed hook in this
+     * FreeRTOS heap implementation. */
+    kf->ControlVector = NULL;
+    if (uSize != 0)
+    {
+        kf->ControlVector = (float *)user_malloc(sizeof_float * uSize);
+        memset(kf->ControlVector, 0, sizeof_float * uSize);
+    }
 
     // xhat x(k|k)
     kf->xhat_data = (float *)user_malloc(sizeof_float * xhatSize);
@@ -274,7 +281,10 @@ void Kalman_Filter_Measure(KalmanFilter_t *kf)
         memset(kf->MeasuredVector, 0, sizeof_float * kf->zSize);
     }
 
-    memcpy(kf->u_data, kf->ControlVector, sizeof_float * kf->uSize);
+    if (kf->uSize != 0)
+    {
+        memcpy(kf->u_data, kf->ControlVector, sizeof_float * kf->uSize);
+    }
 }
 
 void Kalman_Filter_xhatMinusUpdate(KalmanFilter_t *kf)

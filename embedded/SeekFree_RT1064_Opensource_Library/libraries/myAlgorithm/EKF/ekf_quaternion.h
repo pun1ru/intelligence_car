@@ -39,6 +39,9 @@ typedef struct {
 
     //四元数,零偏过程噪声
     float Q1,Q2;
+    float GyroNoiseVariance[3];
+    uint8_t GyroNoiseCalibrated;
+    float AccelNoiseVariance[3];
 
     //加速度量测噪声
     float R;
@@ -56,7 +59,9 @@ typedef struct {
 }QEKF_INS_t;
 
 extern QEKF_INS_t QEKF_INS;
-void IMU_QuaternionEKF_Init(float process_noise1, float process_noise2, float measure_noise, float lambda);
+void IMU_QuaternionEKF_Init(float process_noise1, float process_noise2, float measure_noise, float lambda,
+                             float gyro_noise_x_dps2, float gyro_noise_y_dps2, float gyro_noise_z_dps2,
+                             float accel_noise_x_norm2, float accel_noise_y_norm2, float accel_noise_z_norm2);
 void IMU_QuaternionEKF_Update(float gx, float gy, float gz, float ax, float ay, float az, float dt);
 
 #endif

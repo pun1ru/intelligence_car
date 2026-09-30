@@ -20,11 +20,14 @@ float IMU_QuaternionEKF_K[18];
 //量测矩阵
 float IMU_QuaternionEKF_H[18];
 
+#define IMU_DPS_TO_RAD_LOCAL                    ( 0.017453292519943f)
+
 static float invSqrt(float x);
 static void IMU_QuaternionEKF_Observe(KalmanFilter_t *kf);
 static void IMU_QuaternionEKF_F_Linearization_P_Fading(KalmanFilter_t *kf);
 static void IMU_QuaternionEKF_SetH(KalmanFilter_t *kf);
 static void IMU_QuaternionEKF_xhatUpdate(KalmanFilter_t *kf);
+static void IMU_QuaternionEKF_SetQ(float dt);
 
 /**
  * @brief Quaternion EKF initialization and some reference value
@@ -34,12 +37,21 @@ static void IMU_QuaternionEKF_xhatUpdate(KalmanFilter_t *kf);
  * @param[in] lambda         fading coefficient          0.9996
  * @param[in] lpf            lowpass filter coefficient  0
  */
-void IMU_QuaternionEKF_Init(float process_noise1, float process_noise2, float measure_noise, float lambda)
+void IMU_QuaternionEKF_Init(float process_noise1, float process_noise2, float measure_noise, float lambda,
+                            float gyro_noise_x_dps2, float gyro_noise_y_dps2, float gyro_noise_z_dps2,
+                            float accel_noise_x_norm2, float accel_noise_y_norm2, float accel_noise_z_norm2)
 {
     QEKF_INS.Initialized = 1;
     QEKF_INS.Q1 = process_noise1;
     QEKF_INS.Q2 = process_noise2;
     QEKF_INS.R = measure_noise;
+    QEKF_INS.GyroNoiseVariance[0] = gyro_noise_x_dps2 * IMU_DPS_TO_RAD_LOCAL * IMU_DPS_TO_RAD_LOCAL;
+    QEKF_INS.GyroNoiseVariance[1] = gyro_noise_y_dps2 * IMU_DPS_TO_RAD_LOCAL * IMU_DPS_TO_RAD_LOCAL;
+    QEKF_INS.GyroNoiseVariance[2] = gyro_noise_z_dps2 * IMU_DPS_TO_RAD_LOCAL * IMU_DPS_TO_RAD_LOCAL;
+    QEKF_INS.GyroNoiseCalibrated = 1U;
+    QEKF_INS.AccelNoiseVariance[0] = accel_noise_x_norm2;
+    QEKF_INS.AccelNoiseVariance[1] = accel_noise_y_norm2;
+    QEKF_INS.AccelNoiseVariance[2] = accel_noise_z_norm2;
     QEKF_INS.ChiSquareTestThreshold = 1e-8;
     QEKF_INS.ConvergeFlag = 0;
     QEKF_INS.ErrorCount = 0;
@@ -87,7 +99,9 @@ void IMU_QuaternionEKF_Update(float gx, float gy, float gz, float ax, float ay, 
     static float accelInvNorm;
     if (!QEKF_INS.Initialized)
     {
-        IMU_QuaternionEKF_Init(10, 0.001, 1000000 * 10, 0.9996 * 0 + 1);
+        IMU_QuaternionEKF_Init(10, 0.001, 1000000 * 10, 0.9996 * 0 + 1,
+                               10.0f, 10.0f, 10.0f,
+                               1.0e-6f, 1.0e-6f, 1.0e-6f);
     }
 
     /*   F, number with * represent vals to be set
@@ -162,15 +176,10 @@ void IMU_QuaternionEKF_Update(float gx, float gy, float gz, float ax, float ay, 
     }
 
     // set Q R,过程噪声和观测噪声矩阵
-    QEKF_INS.IMU_QuaternionEKF.Q_data[0] = QEKF_INS.Q1 * QEKF_INS.dt;
-    QEKF_INS.IMU_QuaternionEKF.Q_data[7] = QEKF_INS.Q1 * QEKF_INS.dt;
-    QEKF_INS.IMU_QuaternionEKF.Q_data[14] = QEKF_INS.Q1 * QEKF_INS.dt;
-    QEKF_INS.IMU_QuaternionEKF.Q_data[21] = QEKF_INS.Q1 * QEKF_INS.dt;
-    QEKF_INS.IMU_QuaternionEKF.Q_data[28] = QEKF_INS.Q2 * QEKF_INS.dt;
-    QEKF_INS.IMU_QuaternionEKF.Q_data[35] = QEKF_INS.Q2 * QEKF_INS.dt;
-    QEKF_INS.IMU_QuaternionEKF.R_data[0] = QEKF_INS.R;
-    QEKF_INS.IMU_QuaternionEKF.R_data[4] = QEKF_INS.R;
-    QEKF_INS.IMU_QuaternionEKF.R_data[8] = QEKF_INS.R;
+    IMU_QuaternionEKF_SetQ(QEKF_INS.dt);
+    QEKF_INS.IMU_QuaternionEKF.R_data[0] = QEKF_INS.AccelNoiseVariance[0];
+    QEKF_INS.IMU_QuaternionEKF.R_data[4] = QEKF_INS.AccelNoiseVariance[1];
+    QEKF_INS.IMU_QuaternionEKF.R_data[8] = QEKF_INS.AccelNoiseVariance[2];
 
     // 调用kalman_filter.c封装好的函数,注意几个User_Funcx_f的调用
     Kalman_Filter_Update(&QEKF_INS.IMU_QuaternionEKF);
@@ -188,6 +197,51 @@ void IMU_QuaternionEKF_Update(float gx, float gy, float gz, float ax, float ay, 
     QEKF_INS.yaw = atan2f(2.0f * (QEKF_INS.q[0] * QEKF_INS.q[3] + QEKF_INS.q[1] * QEKF_INS.q[2]), 2.0f * (QEKF_INS.q[0] * QEKF_INS.q[0] + QEKF_INS.q[1] * QEKF_INS.q[1]) - 1.0f) * 57.295779513f;
     QEKF_INS.pitch = atan2f(2.0f * (QEKF_INS.q[0] * QEKF_INS.q[1] + QEKF_INS.q[2] * QEKF_INS.q[3]), 2.0f * (QEKF_INS.q[0] * QEKF_INS.q[0] + QEKF_INS.q[3] * QEKF_INS.q[3]) - 1.0f) * 57.295779513f;
     QEKF_INS.roll = asinf(-2.0f * (QEKF_INS.q[1] * QEKF_INS.q[3] - QEKF_INS.q[0] * QEKF_INS.q[2])) * 57.295779513f;
+}
+
+static void IMU_QuaternionEKF_SetQ(float dt)
+{
+    uint8_t i;
+    uint8_t j;
+
+    memset(QEKF_INS.IMU_QuaternionEKF.Q_data, 0, sizeof_float * 6U * 6U);
+
+    if (QEKF_INS.GyroNoiseCalibrated != 0U)
+    {
+        float q0 = QEKF_INS.IMU_QuaternionEKF.xhat_data[0];
+        float q1 = QEKF_INS.IMU_QuaternionEKF.xhat_data[1];
+        float q2 = QEKF_INS.IMU_QuaternionEKF.xhat_data[2];
+        float q3 = QEKF_INS.IMU_QuaternionEKF.xhat_data[3];
+        float gyro_noise_map[4][3] = {
+            {-q1, -q2, -q3},
+            { q0, -q3,  q2},
+            { q3,  q0, -q1},
+            {-q2,  q1,  q0}
+        };
+        float scale = 0.25f * dt * dt;
+
+        /* Propagate independent X/Y/Z gyro rate noise into quaternion Q. */
+        for (i = 0U; i < 4U; i++)
+        {
+            for (j = 0U; j < 4U; j++)
+            {
+                QEKF_INS.IMU_QuaternionEKF.Q_data[i * 6U + j] =
+                    scale * (gyro_noise_map[i][0] * gyro_noise_map[j][0] * QEKF_INS.GyroNoiseVariance[0] +
+                             gyro_noise_map[i][1] * gyro_noise_map[j][1] * QEKF_INS.GyroNoiseVariance[1] +
+                             gyro_noise_map[i][2] * gyro_noise_map[j][2] * QEKF_INS.GyroNoiseVariance[2]);
+            }
+        }
+    }
+    else
+    {
+        for (i = 0U; i < 4U; i++)
+        {
+            QEKF_INS.IMU_QuaternionEKF.Q_data[i * 6U + i] = QEKF_INS.Q1 * dt;
+        }
+    }
+
+    QEKF_INS.IMU_QuaternionEKF.Q_data[28] = QEKF_INS.Q2 * dt;
+    QEKF_INS.IMU_QuaternionEKF.Q_data[35] = QEKF_INS.Q2 * dt;
 }
 
 /**
