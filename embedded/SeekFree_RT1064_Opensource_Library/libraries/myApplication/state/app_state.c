@@ -51,6 +51,15 @@ static void enter_protection(app_state_t *state)
 {
     state->vehicle_mode = APP_VEHICLE_PROTECT;
     state->target_speed_m_s = 0.0f;
+    state->target_yaw_deg = 0.0f;
+}
+
+void app_state_force_protection(app_state_t *state)
+{
+    if (state != NULL)
+    {
+        enter_protection(state);
+    }
 }
 
 void app_state_init(app_state_t *state)
@@ -99,7 +108,8 @@ void app_state_step(app_state_t *state, const app_state_buttons_t *buttons,
         (command->type != SERIAL_COMMAND_HEARTBEAT) &&
         (command->type != SERIAL_COMMAND_STATE) &&
         (command->type != SERIAL_COMMAND_SPEED) &&
-        (command->type != SERIAL_COMMAND_YAW))
+        (command->type != SERIAL_COMMAND_YAW) &&
+        (command->type != SERIAL_COMMAND_MOTION))
     {
         command = NULL;
     }
@@ -199,9 +209,18 @@ void app_state_step(app_state_t *state, const app_state_buttons_t *buttons,
             (float)command->value * SERIAL_SPEED_SCALE_MPS,
             BALANCE_SPEED_TARGET_MAX_MPS);
     }
-    else if (command->type == SERIAL_COMMAND_YAW)
+    else if (((command->type == SERIAL_COMMAND_YAW) ||
+              (command->type == SERIAL_COMMAND_MOTION)) &&
+             (state->vehicle_mode == APP_VEHICLE_BALANCE))
     {
-        state->target_yaw_deg = (float)command->value * SERIAL_YAW_SCALE_DEG;
+        state->target_yaw_deg = (float)((command->type == SERIAL_COMMAND_MOTION) ?
+            command->value2 : command->value) * SERIAL_YAW_SCALE_DEG;
+        if (command->type == SERIAL_COMMAND_MOTION)
+        {
+            state->target_speed_m_s = clamp(
+                (float)command->value * SERIAL_SPEED_SCALE_MPS,
+                BALANCE_SPEED_TARGET_MAX_MPS);
+        }
     }
 }
 

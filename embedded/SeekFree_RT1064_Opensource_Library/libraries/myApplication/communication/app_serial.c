@@ -20,6 +20,7 @@ uint8_t app_serial_feed_byte(app_serial_parser_t *parser, uint8_t byte,
     uint8_t checksum;
     uint8_t index;
     uint16_t raw_value;
+    uint16_t raw_value2;
 
     if ((parser == NULL) || (command == NULL))
     {
@@ -70,7 +71,8 @@ uint8_t app_serial_feed_byte(app_serial_parser_t *parser, uint8_t byte,
     if ((command->type != SERIAL_COMMAND_HEARTBEAT) &&
         (command->type != SERIAL_COMMAND_STATE) &&
         (command->type != SERIAL_COMMAND_SPEED) &&
-        (command->type != SERIAL_COMMAND_YAW))
+        (command->type != SERIAL_COMMAND_YAW) &&
+        (command->type != SERIAL_COMMAND_MOTION))
     {
         return 0U;
     }
@@ -78,6 +80,15 @@ uint8_t app_serial_feed_byte(app_serial_parser_t *parser, uint8_t byte,
                 ((uint16_t)parser->bytes[4] << 8U);
     command->value = (raw_value <= INT16_MAX) ? (int16_t)raw_value :
                      (int16_t)((int32_t)raw_value - (int32_t)UINT16_MAX - 1);
+    raw_value2 = (uint16_t)parser->bytes[5] |
+                 ((uint16_t)parser->bytes[6] << 8U);
+    command->value2 = (raw_value2 <= INT16_MAX) ? (int16_t)raw_value2 :
+                      (int16_t)((int32_t)raw_value2 - (int32_t)UINT16_MAX - 1);
+    if ((command->type != SERIAL_COMMAND_MOTION) &&
+        (command->value2 != 0))
+    {
+        return 0U;
+    }
     if ((command->type == SERIAL_COMMAND_STATE) &&
         (command->value != SERIAL_STATE_PROTECT) &&
         (command->value != SERIAL_STATE_BALANCE) &&

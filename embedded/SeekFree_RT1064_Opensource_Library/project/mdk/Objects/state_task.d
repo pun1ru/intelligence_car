@@ -1,9 +1,8 @@
 ./objects/state_task.o: ..\user\src\state_task.c ..\user\inc\state_task.h \
-  ..\..\libraries\myApplication\communication\app_serial.h \
   C:\Keil_v5\ARM\ARMCLANG\Bin\..\include\stdint.h \
-  ..\user\inc\general_define.h \
   ..\..\libraries\myApplication\state\app_state.h \
-  ..\user\inc\estimate_task.h \
+  ..\..\libraries\myApplication\communication\app_serial.h \
+  ..\user\inc\general_define.h ..\user\inc\estimate_task.h \
   ..\..\libraries\Freertos\include\FreeRTOS.h \
   C:\Keil_v5\ARM\ARMCLANG\Bin\..\include\stddef.h \
   ..\..\libraries\Freertos\FreeRTOSConfig.h \
@@ -12,11 +11,10 @@
   ..\..\libraries\Freertos\include\deprecated_definitions.h \
   ..\..\libraries\Freertos\portable\GCC\ARM_CM7\r0p1\portmacro.h \
   ..\..\libraries\Freertos\include\mpu_wrappers.h \
-  ..\user\inc\receive_task.h \
+  ..\..\libraries\Freertos\include\queue.h \
+  ..\..\libraries\Freertos\include\task.h \
+  ..\..\libraries\Freertos\include\list.h ..\user\inc\receive_task.h \
   ..\..\libraries\myApplication\sensor\app_attitude.h \
   ..\..\libraries\myApplication\sensor\app_sensor.h \
   ..\..\libraries\myApplication\sensor\app_calibration.h \
-  ..\..\libraries\Freertos\include\semphr.h \
-  ..\..\libraries\Freertos\include\queue.h \
-  ..\..\libraries\Freertos\include\task.h \
-  ..\..\libraries\Freertos\include\list.h ..\user\inc\task_metrics.h
+  ..\..\libraries\Freertos\include\semphr.h ..\user\inc\task_metrics.h

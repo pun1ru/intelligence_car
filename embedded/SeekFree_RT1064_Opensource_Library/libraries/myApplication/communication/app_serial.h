@@ -14,6 +14,7 @@ typedef struct
 {
     uint8_t type;
     int16_t value;
+    int16_t value2;
 } app_serial_command_t;
 
 void app_serial_init(void);

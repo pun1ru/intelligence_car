@@ -16,7 +16,7 @@ embedded/SeekFree_RT1064_Opensource_Library/
     │   ├── sensor/              IMU、编码器采样及姿态估计、校准
     │   ├── motion/              轮电机控制流程
     │   ├── interaction/         蜂鸣器和屏幕显示
-    │   ├── state/               车辆状态机（当前待实现）
+    │   ├── state/               车辆状态机
     │   └── communication/       串口通信
     ├── myDriver/                自有驱动层：板级设备与逐飞接口适配
     ├── zf_common/               逐飞公共库
@@ -75,8 +75,8 @@ Task ──使用──> FreeRTOS（调度与通信）
 
 当前板级外设访问集中在 `myDriver`。`myApplication` 的系统、传感器、运动、交互外设、通信和状态目录均已有实现。屏幕输出由 `interaction/app_display` 管理，串口帧由 `communication/app_serial` 管理。`receive_task` 用长度为 1 的 FreeRTOS 队列发布 IMU、编码器和姿态快照；`estimate_task` 由信号量唤醒。任务运行统计独立放在 `project/user/src/task_metrics.c`。Kalman 算法通过调用方提供的分配器获取内存，算法头文件不再包含 FreeRTOS。
 
-`state_task` 与 `decision_task` 目前仍为空任务框架，`app_control` 仍执行原有的开关控制电机测试动作。新的编码器物理量换算、轮速闭环、平衡角度/速度串级控制、串口命令解析和车辆状态机已独立实现，尚未接入 Task；当前固件不会执行这些新控制动作。
+`state_task` 按周期读取按键、拨码、姿态及串口命令，调用 `app_state` 更新状态，并通过单元素队列发布状态快照；`estimate_task` 负责姿态计算、校准与 EKF 重置。`decision_task` 仍为空任务框架。`control_task` 每 5 ms 读取状态和姿态：平衡/导航站立状态调用 pitch 角度环，目标 `-90 deg`；C26/C27 双开校准模式下，每 10 ms 执行 C15 左轮、C14 右轮的 1 m/s 轮速闭环测试。控制任务发现姿态无效或偏离直立超过 `45 deg` 时，当周期清零 PWM 并通知状态任务锁存保护。控制、IMU 接收和姿态解算任务优先级高于 TFT 显示任务。速度和 yaw 外环尚未接入电机调度。
 
-校准函数由调用任务调度时间窗口，只能从非 `receive_task` 的任务上下文调用；统计计算在 Application/Algorithm 完成。校准结果读取若与更新并发，调用方需要在 Task 层做好同步。姿态估计仍沿用 1 ms 固定更新步长和原有 EKF 初始化参数，实际采样间隔、任务负载及传感器失效后的行为需要上板验证。
+校准在 `estimate_task` 中按样本非阻塞执行，结果仅在 RAM 中保存；`receive_task` 持续发布 IMU 和编码器快照。姿态估计按实际样本 tick 间隔积分，屏幕按相邻编码器绝对计数差分计算轮速。车体坐标、轮系正方向、引脚和拨码操作见 [车体约定](VEHICLE_CONVENTIONS.md)，上位机帧草案见 [串口协议](SERIAL_PROTOCOL.md)。
 
 新增模块评审时检查：文件是否位于所属层、头文件是否泄漏上层/第三方类型、依赖图是否有环、任务是否仅处理调度与通信、异常时执行器是否进入安全状态。

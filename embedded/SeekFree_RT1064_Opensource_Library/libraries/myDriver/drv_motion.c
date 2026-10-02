@@ -48,8 +48,8 @@ void drv_motion_init(uint32_t key_period_ms)
 {
     key_init(key_period_ms);
 
-    gpio_init(MOTOR_LEFT_DIRECTION_PIN, GPO, GPIO_LOW, GPO_PUSH_PULL);
-    gpio_init(MOTOR_RIGHT_DIRECTION_PIN, GPO, GPIO_LOW, GPO_PUSH_PULL);
+    gpio_init(MOTOR_LEFT_DIRECTION_PIN, GPO, GPIO_HIGH, GPO_PUSH_PULL);
+    gpio_init(MOTOR_RIGHT_DIRECTION_PIN, GPO, GPIO_HIGH, GPO_PUSH_PULL);
     pwm_init(MOTOR_LEFT_PWM_CHANNEL, MOTOR_PWM_FREQUENCY_HZ, 0U);
     pwm_init(MOTOR_RIGHT_PWM_CHANNEL, MOTOR_PWM_FREQUENCY_HZ, 0U);
 

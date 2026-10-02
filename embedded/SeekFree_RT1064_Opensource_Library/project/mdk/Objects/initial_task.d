@@ -20,4 +20,7 @@
   ..\..\libraries\Freertos\include\queue.h \
   ..\..\libraries\Freertos\include\task.h \
   ..\..\libraries\Freertos\include\list.h ..\user\inc\send_task.h \
-  ..\user\inc\state_task.h ..\user\inc\task_metrics.h
+  ..\user\inc\state_task.h \
+  ..\..\libraries\myApplication\state\app_state.h \
+  ..\..\libraries\myApplication\communication\app_serial.h \
+  ..\user\inc\task_metrics.h

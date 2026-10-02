@@ -48,3 +48,55 @@ uint8_t app_encoder_convert(const app_encoder_sample_t *sample, float dt_s,
                  radians_per_count, dt_s);
     return 1U;
 }
+
+static int16_t counter_delta(int16_t current, int16_t previous)
+{
+    int32_t delta = (int32_t)current - (int32_t)previous;
+
+    if (delta > INT16_MAX)
+    {
+        delta -= (int32_t)UINT16_MAX + 1;
+    }
+    else if (delta < INT16_MIN)
+    {
+        delta += (int32_t)UINT16_MAX + 1;
+    }
+    return (int16_t)delta;
+}
+
+void app_encoder_tracker_reset(app_encoder_tracker_t *tracker)
+{
+    if (tracker != NULL)
+    {
+        *tracker = (app_encoder_tracker_t){0};
+    }
+}
+
+uint8_t app_encoder_tracker_step(app_encoder_tracker_t *tracker,
+                                 const app_encoder_sample_t *absolute,
+                                 float dt_s, app_encoder_motion_t *motion)
+{
+    app_encoder_sample_t delta;
+
+    if ((tracker == NULL) || (absolute == NULL) || (motion == NULL))
+    {
+        return 0U;
+    }
+    if (tracker->initialized == 0U)
+    {
+        tracker->previous = *absolute;
+        tracker->initialized = 1U;
+        return 0U;
+    }
+    delta.left_count = counter_delta(absolute->left_count,
+                                     tracker->previous.left_count);
+    delta.right_count = counter_delta(absolute->right_count,
+                                      tracker->previous.right_count);
+    if (app_encoder_convert(&delta, dt_s, &tracker->motion) == 0U)
+    {
+        return 0U;
+    }
+    tracker->previous = *absolute;
+    *motion = tracker->motion;
+    return 1U;
+}

@@ -1,18 +1,18 @@
 #ifndef GENERAL_DEFINE_H
 #define GENERAL_DEFINE_H
 
-#define STATE_TASK_PRIORITY 1
+#define STATE_TASK_PRIORITY 2
 #define DECISION_TASK_PRIORITY 1
-#define ESTIMATE_TASK_PRIORITY 1
-#define CONTROL_TASK_PRIORITY 1
-#define RECEIVE_TASK_PRIORITY 1
+#define ESTIMATE_TASK_PRIORITY 3
+#define CONTROL_TASK_PRIORITY 4
+#define RECEIVE_TASK_PRIORITY 3
 #define SEND_TASK_PRIORITY 1
 #define DEBUG_TASK_PRIORITY 1
 
 #define STATE_TASK_PERIOD_MS 10U
 #define DECISION_TASK_PERIOD_MS 10U
 #define ESTIMATE_TASK_PERIOD_MS 1U
-#define CONTROL_TASK_PERIOD_MS 10U
+#define CONTROL_TASK_PERIOD_MS 5U
 #define RECEIVE_TASK_PERIOD_MS 1U
 #define SEND_TASK_PERIOD_MS 100U
 #define DEBUG_TASK_PERIOD_MS 100U
@@ -42,22 +42,26 @@
 #define SEND_TASK_NAME "send_task"
 #define DEBUG_TASK_NAME "debug_task"
 
-/* Board calibration. Set both geometry values before using physical wheel feedback. */
-#ifndef WHEEL_ENCODER_COUNTS_PER_REV
-#define WHEEL_ENCODER_COUNTS_PER_REV 0.0f
-#endif
-#ifndef WHEEL_RADIUS_M
-#define WHEEL_RADIUS_M               0.0f
-#endif
+/* QTMR counts A rising edges only. Confirm 1024 is counts per encoder-shaft revolution in this mode. */
+#define WHEEL_ENCODER_COUNTS_PER_ENCODER_REV 1024.0f
+#define WHEEL_GEAR_TEETH                       68.0f
+#define ENCODER_GEAR_TEETH                     30.0f
+#define WHEEL_ENCODER_COUNTS_PER_REV           (WHEEL_ENCODER_COUNTS_PER_ENCODER_REV * \
+                                               WHEEL_GEAR_TEETH / ENCODER_GEAR_TEETH)
+#define WHEEL_DIAMETER_M                       0.064f
+#define WHEEL_RADIUS_M                         (WHEEL_DIAMETER_M * 0.5f)
+#define WHEEL_TRACK_M                          0.200f
 #ifndef WHEEL_LEFT_COUNT_SIGN
 #define WHEEL_LEFT_COUNT_SIGN        1
 #endif
 #ifndef WHEEL_RIGHT_COUNT_SIGN
-#define WHEEL_RIGHT_COUNT_SIGN       1
+#define WHEEL_RIGHT_COUNT_SIGN       -1
 #endif
-#define WHEEL_LEFT_PWM_FORWARD_LEVEL 1U
-#define WHEEL_RIGHT_PWM_FORWARD_LEVEL 1U
+#define WHEEL_LEFT_PWM_FORWARD_LEVEL 0U
+#define WHEEL_RIGHT_PWM_FORWARD_LEVEL 0U
 #define MOTOR_PWM_FREQUENCY_HZ       17000U
+#define MOTOR_TEST_TARGET_SPEED_MPS 1.0f
+#define MOTOR_TEST_MAX_PWM_DUTY     5000U
 #define MOTOR_LEFT_PWM_CHANNEL       PWM2_MODULE0_CHA_C6
 #define MOTOR_LEFT_DIRECTION_PIN     C7
 #define MOTOR_RIGHT_PWM_CHANNEL      PWM2_MODULE1_CHA_C8
@@ -68,19 +72,22 @@
 #define ENCODER_RIGHT_INDEX          QTIMER1_ENCODER2
 #define ENCODER_RIGHT_CHANNEL_1      QTIMER1_ENCODER2_CH1_C2
 #define ENCODER_RIGHT_CHANNEL_2      QTIMER1_ENCODER2_CH2_C24
-#define CONTROL_PWM_LIMIT            10000.0f
-#define CONTROL_PWM_POLARITY         1.0f
+#define WHEEL_SPEED_PWM_POLARITY     1.0f
+#define BALANCE_ANGLE_PWM_POLARITY   -1.0f
 #define BALANCE_SPEED_TO_TILT_SIGN   1.0f
 
 /* The wheel-speed test is independent of the balance cascade. */
 #define WHEEL_SPEED_LOOP_PERIOD_MS   10U
+#define WHEEL_SPEED_PWM_LIMIT        ((float)MOTOR_TEST_MAX_PWM_DUTY)
 #define BALANCE_ANGLE_PERIOD_MS      5U
 #define BALANCE_SPEED_PERIOD_MS      20U
-#define BALANCE_UPRIGHT_PITCH_DEG    0.0f
+#define BALANCE_UPRIGHT_PITCH_DEG    -90.0f
+#define BALANCE_ANGLE_PWM_LIMIT      3000.0f
+#define ATTITUDE_ROLL_SIGN           -1.0f
 #define BALANCE_TARGET_TILT_MAX_DEG  10.0f
 #define BALANCE_SPEED_TARGET_MAX_MPS 1.0f
-#define WHEEL_SPEED_KP               1000.0f
-#define WHEEL_SPEED_KI               0.0f
+#define WHEEL_SPEED_KP               4000.0f
+#define WHEEL_SPEED_KI               1200.0f
 #define WHEEL_SPEED_KD               0.0f
 #define BALANCE_ANGLE_KP             300.0f
 #define BALANCE_ANGLE_KI             0.0f
@@ -103,9 +110,10 @@
 #define IMU_CALIBRATION_MIN_SAMPLES  100U
 #define IMU_CALIBRATION_GYRO_NOISE_FLOOR_DPS2 0.000001f
 #define IMU_CALIBRATION_ACC_NOISE_FLOOR_NORM2 0.000001f
-#define VEHICLE_ATTITUDE_TIMEOUT_MS  100U
+#define VEHICLE_ATTITUDE_TIMEOUT_MS  30U
+#define VEHICLE_STATE_TIMEOUT_MS     30U
 #define VEHICLE_ARM_PITCH_MAX_DEG    10.0f
-#define VEHICLE_FALL_PITCH_MAX_DEG   VEHICLE_ARM_PITCH_MAX_DEG
+#define VEHICLE_FALL_PITCH_MAX_DEG   45.0f
 #define VEHICLE_SERIAL_TIMEOUT_MS    500U
 
 /* Provisional 8-byte command frame: A5 5A command data[4] xor(command,data). */
@@ -116,6 +124,7 @@
 #define SERIAL_COMMAND_STATE         0x01U
 #define SERIAL_COMMAND_SPEED         0x02U
 #define SERIAL_COMMAND_YAW           0x03U
+#define SERIAL_COMMAND_MOTION        0x04U
 #define SERIAL_STATE_PROTECT         0x00U
 #define SERIAL_STATE_BALANCE         0x01U
 #define SERIAL_STATE_NAVIGATION      0x02U

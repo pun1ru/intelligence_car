@@ -87,6 +87,9 @@ uint8_t app_attitude_step(const app_imu_sample_t *sample, float dt_s,
                                    &attitude->roll,
                                    &attitude->pitch,
                                    &attitude->yaw);
+    attitude->roll *= ATTITUDE_ROLL_SIGN;
+    attitude->pitch_rate_dps = sample->gyro_x_dps - gyro_bias_dps[0];
     return (isfinite(attitude->roll) && isfinite(attitude->pitch) &&
-            isfinite(attitude->yaw)) ? 1U : 0U;
+            isfinite(attitude->yaw) &&
+            isfinite(attitude->pitch_rate_dps)) ? 1U : 0U;
 }

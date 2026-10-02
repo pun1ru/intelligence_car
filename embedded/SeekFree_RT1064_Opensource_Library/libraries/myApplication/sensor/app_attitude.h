@@ -11,6 +11,7 @@ typedef struct
     float roll;
     float pitch;
     float yaw;
+    float pitch_rate_dps;
 } app_attitude_t;
 
 void app_attitude_init(void *(*allocate)(size_t));

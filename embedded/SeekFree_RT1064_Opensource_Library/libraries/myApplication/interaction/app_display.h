@@ -6,6 +6,6 @@
 
 void app_display_init(void);
 void app_display_update(const app_attitude_t *attitude,
-                        const app_encoder_sample_t *encoder);
+                        const app_encoder_sample_t *encoder, float dt_s);
 
 #endif

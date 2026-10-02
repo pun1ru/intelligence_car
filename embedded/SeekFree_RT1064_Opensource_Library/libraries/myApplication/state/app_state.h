@@ -48,5 +48,6 @@ void app_state_step(app_state_t *state, const app_state_buttons_t *buttons,
                     uint8_t attitude_valid, float pitch_deg, uint32_t dt_ms,
                     const app_serial_command_t *command);
 uint8_t app_state_balance_enabled(const app_state_t *state);
+void app_state_force_protection(app_state_t *state);
 
 #endif

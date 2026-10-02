@@ -23,9 +23,9 @@ static float clamp(float value, float limit)
     return value;
 }
 
-static int32_t pwm_value(float value)
+static int32_t pwm_value(float value, float polarity, float limit)
 {
-    return (int32_t)clamp(value * CONTROL_PWM_POLARITY, CONTROL_PWM_LIMIT);
+    return (int32_t)clamp(value * polarity, limit);
 }
 
 void app_balance_init(app_balance_t *control)
@@ -35,11 +35,11 @@ void app_balance_init(app_balance_t *control)
         return;
     }
     control_pid_init(&control->wheel_left, WHEEL_SPEED_KP, WHEEL_SPEED_KI,
-                     WHEEL_SPEED_KD, CONTROL_PWM_LIMIT);
+                     WHEEL_SPEED_KD, WHEEL_SPEED_PWM_LIMIT);
     control_pid_init(&control->wheel_right, WHEEL_SPEED_KP, WHEEL_SPEED_KI,
-                     WHEEL_SPEED_KD, CONTROL_PWM_LIMIT);
+                     WHEEL_SPEED_KD, WHEEL_SPEED_PWM_LIMIT);
     control_pid_init(&control->angle, BALANCE_ANGLE_KP, BALANCE_ANGLE_KI,
-                     BALANCE_ANGLE_KD, CONTROL_PWM_LIMIT);
+                     BALANCE_ANGLE_KD, BALANCE_ANGLE_PWM_LIMIT);
     control_pid_init(&control->speed, BALANCE_SPEED_KP, BALANCE_SPEED_KI,
                      BALANCE_SPEED_KD, BALANCE_TARGET_TILT_MAX_DEG);
     control->target_tilt_deg = BALANCE_UPRIGHT_PITCH_DEG;
@@ -72,9 +72,11 @@ void app_balance_wheel_speed_step(app_balance_t *control,
         return;
     }
     output->left_pwm = pwm_value(control_pid_step(&control->wheel_left,
-        left_target_m_s, left_speed_m_s, 0.0f, dt_s));
+        left_target_m_s, left_speed_m_s, 0.0f, dt_s),
+        WHEEL_SPEED_PWM_POLARITY, WHEEL_SPEED_PWM_LIMIT);
     output->right_pwm = pwm_value(control_pid_step(&control->wheel_right,
-        right_target_m_s, right_speed_m_s, 0.0f, dt_s));
+        right_target_m_s, right_speed_m_s, 0.0f, dt_s),
+        WHEEL_SPEED_PWM_POLARITY, WHEEL_SPEED_PWM_LIMIT);
     output->target_tilt_deg = BALANCE_UPRIGHT_PITCH_DEG;
 }
 
@@ -108,7 +110,8 @@ void app_balance_angle_step(app_balance_t *control, uint8_t enabled,
     pwm = control_pid_step(&control->angle, output->target_tilt_deg,
                            pitch_deg, pitch_rate_dps,
                            (float)BALANCE_ANGLE_PERIOD_MS / 1000.0f);
-    output->left_pwm = pwm_value(pwm);
+    output->left_pwm = pwm_value(pwm, BALANCE_ANGLE_PWM_POLARITY,
+                                 BALANCE_ANGLE_PWM_LIMIT);
     output->right_pwm = output->left_pwm;
 }
 

@@ -63,25 +63,37 @@ void drv_io_display_init(void)
     tft180_init();
     tft180_set_font(TFT180_8X16_FONT);
     tft180_set_color(RGB565_RED, RGB565_WHITE);
-    tft180_show_string(0, 0, "IMU ANGLE");
+    tft180_show_string(0, 0, "IMU / WHEELS");
     tft180_show_string(0, 16, "Roll:");
     tft180_show_string(0, 32, "Pitch:");
     tft180_show_string(0, 48, "Yaw:");
-    tft180_show_string(0, 64, "EncL:");
-    tft180_show_string(0, 80, "EncR:");
+    tft180_show_string(0, 64, "L rad/s:");
+    tft180_show_string(0, 80, "L m/s:");
+    tft180_show_string(0, 96, "R rad/s:");
+    tft180_show_string(0, 112, "R m/s:");
+    tft180_show_string(0, 128, "Gx dps:");
+    tft180_show_string(64, 64, "--");
+    tft180_show_string(64, 80, "--");
+    tft180_show_string(64, 96, "--");
+    tft180_show_string(64, 112, "--");
 }
 
-void drv_io_display_angles(float roll, float pitch, float yaw)
+void drv_io_display_angles(float roll, float pitch, float yaw,
+                           float pitch_rate_dps)
 {
     tft180_show_float(48, 16, roll, 3, 1);
     tft180_show_float(48, 32, pitch, 3, 1);
     tft180_show_float(48, 48, yaw, 3, 1);
+    tft180_show_float(64, 128, pitch_rate_dps, 3, 1);
 }
 
-void drv_io_display_encoders(int16_t left_count, int16_t right_count)
+void drv_io_display_wheels(float left_omega_rad_s, float left_speed_m_s,
+                           float right_omega_rad_s, float right_speed_m_s)
 {
-    tft180_show_int(48, 64, left_count, 6);
-    tft180_show_int(48, 80, right_count, 6);
+    tft180_show_float(64, 64, left_omega_rad_s, 3, 2);
+    tft180_show_float(64, 80, left_speed_m_s, 3, 3);
+    tft180_show_float(64, 96, right_omega_rad_s, 3, 2);
+    tft180_show_float(64, 112, right_speed_m_s, 3, 3);
 }
 
 void drv_io_buzzer_init(void)

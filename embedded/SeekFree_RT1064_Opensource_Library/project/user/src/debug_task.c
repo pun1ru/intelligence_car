@@ -8,6 +8,7 @@
 void debug_task(void *pvParameters)
 {
     TickType_t last_wake_tick = xTaskGetTickCount();
+    TickType_t last_sample_tick = last_wake_tick;
 
     (void)pvParameters;
     app_display_init();
@@ -18,7 +19,11 @@ void debug_task(void *pvParameters)
 
         if (receive_display_snapshot(&attitude, &encoder) != 0U)
         {
-            app_display_update(&attitude, &encoder);
+            TickType_t now = xTaskGetTickCount();
+            app_display_update(&attitude, &encoder,
+                               (float)(now - last_sample_tick) /
+                               (float)configTICK_RATE_HZ);
+            last_sample_tick = now;
         }
         vTaskDelayUntil(&last_wake_tick, pdMS_TO_TICKS(DEBUG_TASK_PERIOD_MS));
     }

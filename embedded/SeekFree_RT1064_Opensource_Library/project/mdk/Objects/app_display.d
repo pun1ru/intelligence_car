@@ -6,4 +6,5 @@
   ..\..\libraries\myApplication\sensor\app_sensor.h \
   C:\Keil_v5\ARM\ARMCLANG\Bin\..\include\stdint.h \
   ..\..\libraries\myApplication\sensor\app_calibration.h \
+  ..\..\libraries\myApplication\sensor\app_encoder.h \
   ..\..\libraries\myDriver\drv_io.h
