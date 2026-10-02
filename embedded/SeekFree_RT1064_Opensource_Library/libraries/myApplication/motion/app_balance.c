@@ -42,7 +42,7 @@ void app_balance_init(app_balance_t *control)
                      BALANCE_ANGLE_KD, BALANCE_ANGLE_PWM_LIMIT);
     control_pid_init(&control->speed, BALANCE_SPEED_KP, BALANCE_SPEED_KI,
                      BALANCE_SPEED_KD, BALANCE_TARGET_TILT_MAX_DEG);
-    control->target_tilt_deg = BALANCE_UPRIGHT_PITCH_DEG;
+    control->target_tilt_deg = BALANCE_ANGLE_TARGET_PITCH_DEG;
     control->speed_elapsed_ms = 0U;
 }
 
@@ -56,7 +56,7 @@ void app_balance_reset(app_balance_t *control)
     control_pid_reset(&control->wheel_right);
     control_pid_reset(&control->angle);
     control_pid_reset(&control->speed);
-    control->target_tilt_deg = BALANCE_UPRIGHT_PITCH_DEG;
+    control->target_tilt_deg = BALANCE_ANGLE_TARGET_PITCH_DEG;
     control->speed_elapsed_ms = 0U;
 }
 
@@ -128,7 +128,7 @@ void app_balance_step(app_balance_t *control, uint8_t enabled,
     }
     output->left_pwm = 0;
     output->right_pwm = 0;
-    output->target_tilt_deg = BALANCE_UPRIGHT_PITCH_DEG;
+    output->target_tilt_deg = BALANCE_ANGLE_TARGET_PITCH_DEG;
 
     if ((enabled == 0U) || !isfinite(target_speed_m_s) ||
         !isfinite(pitch_deg) || !isfinite(pitch_rate_dps) ||
@@ -144,7 +144,7 @@ void app_balance_step(app_balance_t *control, uint8_t enabled,
     if (control->speed_elapsed_ms >= BALANCE_SPEED_PERIOD_MS)
     {
         average_speed = (left_speed_m_s + right_speed_m_s) * 0.5f;
-        control->target_tilt_deg = BALANCE_UPRIGHT_PITCH_DEG +
+        control->target_tilt_deg = BALANCE_ANGLE_TARGET_PITCH_DEG +
             BALANCE_SPEED_TO_TILT_SIGN * control_pid_step(&control->speed,
                 clamp(target_speed_m_s, BALANCE_SPEED_TARGET_MAX_MPS),
                 average_speed, 0.0f,

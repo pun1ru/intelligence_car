@@ -23,6 +23,7 @@
 #define ATTITUDE_ACCEL_LPF_ALPHA      0.95f
 #define ATTITUDE_EKF_CHI_SQUARE_LIMIT 7.815f
 #define ATTITUDE_EKF_CORRECTION_LIMIT 0.01f
+#define ATTITUDE_MADGWICK_BETA        0.2f
 #define ATTITUDE_MAX_SAMPLE_GAP_MS    20U
 #define ATTITUDE_MIN_ACCEL_NORM_G     0.3f
 
@@ -82,6 +83,7 @@
 #define BALANCE_ANGLE_PERIOD_MS      5U
 #define BALANCE_SPEED_PERIOD_MS      20U
 #define BALANCE_UPRIGHT_PITCH_DEG    -90.0f
+#define BALANCE_ANGLE_TARGET_PITCH_DEG -92.0f
 #define BALANCE_ANGLE_PWM_LIMIT      3000.0f
 #define ATTITUDE_ROLL_SIGN           -1.0f
 #define BALANCE_TARGET_TILT_MAX_DEG  10.0f
@@ -93,7 +95,7 @@
 #define BALANCE_ANGLE_KI             0.0f
 #define BALANCE_ANGLE_KD             8.0f
 #define BALANCE_SPEED_KP             4.0f
-#define BALANCE_SPEED_KI             0.0f
+#define BALANCE_SPEED_KI             0.5f
 #define BALANCE_SPEED_KD             0.0f
 
 #define VEHICLE_BUTTON_DEBOUNCE_MS   30U

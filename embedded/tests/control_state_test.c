@@ -216,20 +216,24 @@ static void test_angle_control_protection(void)
     state.vehicle_mode = APP_VEHICLE_BALANCE;
     attitude.pitch = BALANCE_UPRIGHT_PITCH_DEG;
     assert(app_control_step(&state, &attitude) == 0U);
+    assert(applied_left == 600 && applied_right == 600);
+
+    attitude.pitch = BALANCE_ANGLE_TARGET_PITCH_DEG;
+    assert(app_control_step(&state, &attitude) == 0U);
     assert(applied_left == 0 && applied_right == 0);
 
     attitude.pitch = BALANCE_UPRIGHT_PITCH_DEG + 1.0f;
     assert(app_control_step(&state, &attitude) == 0U);
-    assert(applied_left == 300 && applied_right == 300);
+    assert(applied_left == 900 && applied_right == 900);
 
     attitude.pitch = BALANCE_UPRIGHT_PITCH_DEG - 1.0f;
     assert(app_control_step(&state, &attitude) == 0U);
-    assert(applied_left == -300 && applied_right == -300);
+    assert(applied_left == 300 && applied_right == 300);
 
     attitude.pitch = BALANCE_UPRIGHT_PITCH_DEG;
     attitude.pitch_rate_dps = 10.0f;
     assert(app_control_step(&state, &attitude) == 0U);
-    assert(applied_left == 80 && applied_right == 80);
+    assert(applied_left == 680 && applied_right == 680);
     attitude.pitch_rate_dps = 0.0f;
 
     attitude.pitch = BALANCE_UPRIGHT_PITCH_DEG + 46.0f;
@@ -247,11 +251,56 @@ static void test_angle_control_protection(void)
     state.vehicle_mode = APP_VEHICLE_BALANCE;
     attitude.pitch = BALANCE_UPRIGHT_PITCH_DEG + 1.0f;
     assert(app_control_step(&state, &attitude) == 0U);
-    assert(applied_left == 300 && applied_right == 300);
+    assert(applied_left == 900 && applied_right == 900);
     assert(app_control_step(&state, NULL) == 1U);
     assert(applied_left == 0 && applied_right == 0);
     state.vehicle_mode = APP_VEHICLE_PROTECT;
     assert(app_control_step(&state, &attitude) == 0U);
+}
+
+static void test_speed_feedback(void)
+{
+    app_state_t state = {0};
+    app_attitude_t attitude = {0};
+    uint32_t index;
+
+    state.control_mode = APP_STATE_BUTTON_DEBUG;
+    state.vehicle_mode = APP_VEHICLE_PROTECT;
+    attitude.pitch = BALANCE_ANGLE_TARGET_PITCH_DEG;
+    assert(app_control_step(&state, &attitude) == 0U);
+
+    state.vehicle_mode = APP_VEHICLE_BALANCE;
+    for (index = 0U; index < 8U; index++)
+    {
+        test_left_delta = 116;
+        test_right_delta = -116;
+        assert(app_control_step(&state, &attitude) == 0U);
+    }
+    assert(applied_left > 0 && applied_right > 0);
+
+    state.vehicle_mode = APP_VEHICLE_PROTECT;
+    assert(app_control_step(&state, &attitude) == 0U);
+    assert(applied_left == 0 && applied_right == 0);
+
+    state.vehicle_mode = APP_VEHICLE_BALANCE;
+    for (index = 0U; index < 8U; index++)
+    {
+        test_left_delta = -116;
+        test_right_delta = 116;
+        assert(app_control_step(&state, &attitude) == 0U);
+    }
+    assert(applied_left < 0 && applied_right < 0);
+
+    state.vehicle_mode = APP_VEHICLE_PROTECT;
+    assert(app_control_step(&state, &attitude) == 0U);
+    state.vehicle_mode = APP_VEHICLE_BALANCE;
+    state.control_mode = APP_STATE_SERIAL_DEBUG;
+    state.target_speed_m_s = 0.5f;
+    for (index = 0U; index < 8U; index++)
+    {
+        assert(app_control_step(&state, &attitude) == 0U);
+    }
+    assert(applied_left < 0 && applied_right < 0);
 }
 
 static void test_balance(void)
@@ -280,13 +329,21 @@ static void test_balance(void)
     {
         app_balance_step(&control, 1U, 0.5f, BALANCE_UPRIGHT_PITCH_DEG, 0.0f,
                          0.0f, 0.0f, &output);
-        assert(output.target_tilt_deg == BALANCE_UPRIGHT_PITCH_DEG);
+        assert(output.target_tilt_deg == BALANCE_ANGLE_TARGET_PITCH_DEG);
     }
     app_balance_step(&control, 1U, 0.5f, BALANCE_UPRIGHT_PITCH_DEG, 0.0f,
                      0.0f, 0.0f, &output);
-    assert(fabsf(output.target_tilt_deg -
-                 (BALANCE_UPRIGHT_PITCH_DEG + 2.0f)) < 0.0001f);
-    assert(output.left_pwm == -600 && output.right_pwm == -600);
+    assert(output.target_tilt_deg > BALANCE_ANGLE_TARGET_PITCH_DEG);
+    app_balance_reset(&control);
+
+    for (index = 0U; index < 4U; index++)
+    {
+        app_balance_step(&control, 1U, 0.0f,
+                         BALANCE_ANGLE_TARGET_PITCH_DEG, 0.0f,
+                         0.5f, 0.5f, &output);
+    }
+    assert(output.target_tilt_deg < BALANCE_ANGLE_TARGET_PITCH_DEG);
+    assert(output.left_pwm > 0 && output.right_pwm > 0);
     app_balance_step(&control, 1U, 0.0f,
                      BALANCE_UPRIGHT_PITCH_DEG + 46.0f, 0.0f,
                      0.0f, 0.0f, &output);
@@ -437,6 +494,7 @@ int main(void)
     test_encoder_counter_wrap();
     test_motor_probe();
     test_angle_control_protection();
+    test_speed_feedback();
     test_balance();
     test_state_and_serial();
     test_calibration_switches();

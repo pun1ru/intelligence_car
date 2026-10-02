@@ -341,7 +341,7 @@
               <MiscControls>-fno-common  -fdata-sections  -ffreestanding  -fno-builtin  -mthumb -Wno-invalid-source-encoding</MiscControls>
               <Define>CPU_MIMXRT1064DVL6A,SKIP_SYSCLK_INIT,XIP_EXTERNAL_FLASH=1, XIP_BOOT_HEADER_DCD_ENABLE =1, XIP_BOOT_HEADER_ENABLE =1,PRINTF_FLOAT_ENABLE=1, SCANF_FLOAT_ENABLE=1, PRINTF_ADVANCED_ENABLE=1, SCANF_ADVANCED_ENABLE=1, FSL_DRIVER_TRANSFER_DOUBLE_WEAK_IRQ=0, USB_STACK_BM, SDK_OS_FREE_RTOS, DEBUG, MCUXPRESSO_SDK, SD_ENABLED</Define>
               <Undefine></Undefine>
-              <IncludePath>..\user\inc;..\code;..\..\libraries\Freertos;..\..\libraries\Freertos\include;..\..\libraries\Freertos\portable\GCC\ARM_CM7\r0p1;..\..\libraries\Freertos\osa;..\..\libraries\sdk\CMSIS\DSP\Include;..\..\libraries\sdk\CMSIS\DSP\PrivateInclude;..\..\libraries\sdk\startup\mdk;..\..\libraries\sdk\deceive;..\..\libraries\sdk\drives;..\..\libraries\sdk\xip;..\..\libraries\sdk\utilities;..\..\libraries\sdk\utilities\debug_console;..\..\libraries\sdk\utilities\str;..\..\libraries\sdk\cmsis_drivers;..\..\libraries\sdk\CMSIS\Include;..\..\libraries\sdk\CMSIS\Driver\Include;..\..\libraries\sdk\components\lists;..\..\libraries\sdk\components\osa;..\..\libraries\sdk\components\serial_manager;..\..\libraries\sdk\components\uart;..\..\libraries\sdk\board;..\..\libraries\components\fatfs\source;..\..\libraries\components\fatfs\source\fsl_sd_disk;..\..\libraries\components\sdmmc;..\..\libraries\components\sdmmc\common;..\..\libraries\components\sdmmc\host\usdhc;..\..\libraries\components\sdmmc\osa;..\..\libraries\components\sdmmc\sd;..\..\libraries\components\usb\device;..\..\libraries\components\usb\include;..\..\libraries\components\usb\phy;..\..\libraries\components\usb\usb_cdc_adapter;..\..\libraries\zf_common;..\..\libraries\zf_driver;..\..\libraries\zf_device;..\..\libraries\zf_components;..\..\libraries\myAlgorithm;..\..\libraries\myAlgorithm\EKF;..\..\libraries\myAlgorithm\kalman;..\..\libraries\myAlgorithm\lqr;..\..\libraries\myAlgorithm\pid;..\..\libraries\myApplication\system;..\..\libraries\myApplication\sensor;..\..\libraries\myApplication\motion;..\..\libraries\myApplication\interaction;..\..\libraries\myApplication\state;..\..\libraries\myApplication\communication;..\..\libraries\myDriver;..\..\libraries\myAlgorithm\statistics</IncludePath>
+              <IncludePath>..\user\inc;..\code;..\..\libraries\Freertos;..\..\libraries\Freertos\include;..\..\libraries\Freertos\portable\GCC\ARM_CM7\r0p1;..\..\libraries\Freertos\osa;..\..\libraries\sdk\CMSIS\DSP\Include;..\..\libraries\sdk\CMSIS\DSP\PrivateInclude;..\..\libraries\sdk\startup\mdk;..\..\libraries\sdk\deceive;..\..\libraries\sdk\drives;..\..\libraries\sdk\xip;..\..\libraries\sdk\utilities;..\..\libraries\sdk\utilities\debug_console;..\..\libraries\sdk\utilities\str;..\..\libraries\sdk\cmsis_drivers;..\..\libraries\sdk\CMSIS\Include;..\..\libraries\sdk\CMSIS\Driver\Include;..\..\libraries\sdk\components\lists;..\..\libraries\sdk\components\osa;..\..\libraries\sdk\components\serial_manager;..\..\libraries\sdk\components\uart;..\..\libraries\sdk\board;..\..\libraries\components\fatfs\source;..\..\libraries\components\fatfs\source\fsl_sd_disk;..\..\libraries\components\sdmmc;..\..\libraries\components\sdmmc\common;..\..\libraries\components\sdmmc\host\usdhc;..\..\libraries\components\sdmmc\osa;..\..\libraries\components\sdmmc\sd;..\..\libraries\components\usb\device;..\..\libraries\components\usb\include;..\..\libraries\components\usb\phy;..\..\libraries\components\usb\usb_cdc_adapter;..\..\libraries\zf_common;..\..\libraries\zf_driver;..\..\libraries\zf_device;..\..\libraries\zf_components;..\..\libraries\myAlgorithm;..\..\libraries\myAlgorithm\EKF;..\..\libraries\myAlgorithm\kalman;..\..\libraries\myAlgorithm\lqr;..\..\libraries\myAlgorithm\pid;..\..\libraries\myApplication\system;..\..\libraries\myApplication\sensor;..\..\libraries\myApplication\motion;..\..\libraries\myApplication\interaction;..\..\libraries\myApplication\state;..\..\libraries\myApplication\communication;..\..\libraries\myDriver;..\..\libraries\myAlgorithm\statistics;..\..\libraries\myAlgorithm\madgwick</IncludePath>
             </VariousControls>
           </Cads>
           <Aads>
@@ -1367,6 +1367,21 @@
               <FileName>kalman.h</FileName>
               <FileType>5</FileType>
               <FilePath>..\..\libraries\myAlgorithm\kalman\kalman.h</FilePath>
+            </File>
+          </Files>
+        </Group>
+        <Group>
+          <GroupName>myAlgorithm_madgwick</GroupName>
+          <Files>
+            <File>
+              <FileName>madgwick.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\libraries\myAlgorithm\madgwick\madgwick.c</FilePath>
+            </File>
+            <File>
+              <FileName>madgwick.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\..\libraries\myAlgorithm\madgwick\madgwick.h</FilePath>
             </File>
           </Files>
         </Group>

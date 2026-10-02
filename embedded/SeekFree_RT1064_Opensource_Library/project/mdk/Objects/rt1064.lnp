@@ -86,6 +86,7 @@
 ".\objects\running_stats.o"
 ".\objects\ekf_quaternion.o"
 ".\objects\kalman.o"
+".\objects\madgwick.o"
 ".\objects\lqr.o"
 ".\objects\pid.o"
 ".\objects\control_pid.o"

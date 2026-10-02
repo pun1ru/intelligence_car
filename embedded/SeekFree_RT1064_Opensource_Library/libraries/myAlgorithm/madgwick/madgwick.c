@@ -104,7 +104,7 @@ void madgwick_update(madgwick_t *filter,
     q2 = filter->q[2];
     q3 = filter->q[3];
 
-    /* Rate of change of quaternion from gyroscope. *///四元数微分方程
+    /* Rate of change of quaternion from gyroscope. */
     q_dot0 = 0.5f * (-q1 * gyro_x - q2 * gyro_y - q3 * gyro_z);
     q_dot1 = 0.5f * (q0 * gyro_x + q2 * gyro_z - q3 * gyro_y);
     q_dot2 = 0.5f * (q0 * gyro_y - q1 * gyro_z + q3 * gyro_x);

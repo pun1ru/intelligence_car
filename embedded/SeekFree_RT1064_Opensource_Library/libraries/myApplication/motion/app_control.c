@@ -11,6 +11,9 @@
     ((WHEEL_SPEED_LOOP_PERIOD_MS % CONTROL_TASK_PERIOD_MS) != 0U)
 #error Control task must match the angle loop and divide the wheel speed loop period.
 #endif
+#if (BALANCE_SPEED_PERIOD_MS % WHEEL_SPEED_LOOP_PERIOD_MS) != 0U
+#error Balance speed loop period must be a multiple of wheel sampling period.
+#endif
 
 static app_balance_t wheel_test_control;
 static app_balance_t angle_control;
@@ -19,6 +22,20 @@ static uint8_t balance_fault_latched;
 static uint32_t wheel_elapsed_ms;
 static uint16_t test_left_duty;
 static uint16_t test_right_duty;
+static float speed_left_sum_m_s;
+static float speed_right_sum_m_s;
+static float speed_left_m_s;
+static float speed_right_m_s;
+static uint32_t speed_sample_count;
+
+static void reset_speed_feedback(void)
+{
+    speed_left_sum_m_s = 0.0f;
+    speed_right_sum_m_s = 0.0f;
+    speed_left_m_s = 0.0f;
+    speed_right_m_s = 0.0f;
+    speed_sample_count = 0U;
+}
 
 static uint16_t test_duty(int32_t pwm)
 {
@@ -40,6 +57,7 @@ uint8_t app_control_step(const app_state_t *state,
     app_encoder_motion_t motion = {0};
     app_balance_output_t output;
     uint8_t sample_ready = 0U;
+    uint8_t sample_valid = 0U;
     uint8_t test_enabled;
     uint8_t left_pressed;
     uint8_t right_pressed;
@@ -57,11 +75,31 @@ uint8_t app_control_step(const app_state_t *state,
         drv_motion_read_encoder_delta(&counts.left_count, &counts.right_count);
         wheel_elapsed_ms = 0U;
         sample_ready = 1U;
+        sample_valid = app_encoder_convert(&counts,
+            (float)WHEEL_SPEED_LOOP_PERIOD_MS / 1000.0f, &motion);
+        if (sample_valid != 0U)
+        {
+            speed_left_sum_m_s += motion.left.speed_m_s;
+            speed_right_sum_m_s += motion.right.speed_m_s;
+            speed_sample_count++;
+            if (speed_sample_count >=
+                (BALANCE_SPEED_PERIOD_MS / WHEEL_SPEED_LOOP_PERIOD_MS))
+            {
+                speed_left_m_s = speed_left_sum_m_s /
+                    (float)speed_sample_count;
+                speed_right_m_s = speed_right_sum_m_s /
+                    (float)speed_sample_count;
+                speed_left_sum_m_s = 0.0f;
+                speed_right_sum_m_s = 0.0f;
+                speed_sample_count = 0U;
+            }
+        }
     }
     test_enabled = drv_io_calibration_switches_on();
     if (test_enabled != 0U)
     {
         app_balance_reset(&angle_control);
+        reset_speed_feedback();
         left_pressed = drv_io_button_pressed(DRV_IO_BUTTON_C15);
         right_pressed = drv_io_button_pressed(DRV_IO_BUTTON_C14);
         if (left_pressed == 0U)
@@ -78,10 +116,7 @@ uint8_t app_control_step(const app_state_t *state,
         {
             app_balance_reset(&wheel_test_control);
         }
-        else if ((sample_ready != 0U) &&
-                 (app_encoder_convert(&counts,
-                    (float)WHEEL_SPEED_LOOP_PERIOD_MS / 1000.0f,
-                    &motion) != 0U))
+        else if ((sample_ready != 0U) && (sample_valid != 0U))
         {
             app_balance_wheel_speed_step(&wheel_test_control,
                 (left_pressed != 0U) ? MOTOR_TEST_TARGET_SPEED_MPS : 0.0f,
@@ -117,10 +152,14 @@ uint8_t app_control_step(const app_state_t *state,
         (app_state_balance_enabled(state) == 0U))
     {
         app_balance_reset(&angle_control);
+        reset_speed_feedback();
         drv_motion_set_signed(0, 0);
         return 0U;
     }
     if ((balance_fault_latched != 0U) || (attitude == NULL) ||
+        ((sample_ready != 0U) && (sample_valid == 0U)) ||
+        !isfinite(state->target_speed_m_s) ||
+        !isfinite(speed_left_m_s) || !isfinite(speed_right_m_s) ||
         !isfinite(attitude->pitch) ||
         !isfinite(attitude->pitch_rate_dps) ||
         (fabsf(attitude->pitch - BALANCE_UPRIGHT_PITCH_DEG) >
@@ -128,12 +167,14 @@ uint8_t app_control_step(const app_state_t *state,
     {
         balance_fault_latched = 1U;
         app_balance_reset(&angle_control);
+        reset_speed_feedback();
         drv_motion_set_signed(0, 0);
         return 1U;
     }
 
-    app_balance_angle_step(&angle_control, 1U, BALANCE_UPRIGHT_PITCH_DEG,
-                           attitude->pitch, attitude->pitch_rate_dps, &output);
+    app_balance_step(&angle_control, 1U, state->target_speed_m_s,
+                     attitude->pitch, attitude->pitch_rate_dps,
+                     speed_left_m_s, speed_right_m_s, &output);
     app_balance_apply(&output);
     return 0U;
 }
