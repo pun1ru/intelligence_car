@@ -13,7 +13,7 @@ TaskHandle_t debugTaskHandle;
 
 static volatile uint8 buzzer_fast_running;
 
-static void motor_init(void)
+static void motor_init(void)//电机初始化
 {
     gpio_init(MOTOR_LEFT_DIR, GPO, GPIO_LOW, GPO_PUSH_PULL);
     gpio_init(MOTOR_RIGHT_DIR, GPO, GPIO_LOW, GPO_PUSH_PULL);
@@ -21,7 +21,7 @@ static void motor_init(void)
     pwm_init(MOTOR_RIGHT_PWM, MOTOR_PWM_FREQUENCY_HZ, 0U);
 }
 
-void buzzer_init(void)
+void buzzer_init(void)//蜂鸣器初始化
 {
     gpio_init(B11, GPO, GPIO_LOW, GPO_PUSH_PULL);
 }
@@ -80,24 +80,32 @@ void buzzer_beep_fast(void) { buzzer_play(BUZZER_MODE_FAST_CONTINUOUS); }
 
 void initial_task(void *pvParameters)
 {
+    taskENTER_CRITICAL();
     uint32_t metric_start;
     uint8 imu_init_status;
 
     (void)pvParameters;
+
     metric_start = task_metrics_begin();
+
     buzzer_beep_once();
+
     uart_init(UART_8, 115200U, UART8_TX_D16, UART8_RX_D17);
+
     imu_init_status = imu660rc_init(IMU660RC_QUARTERNION_DISABLE);
     g_imu_receive_data.imu_ready = (imu_init_status == 0U) ? 1U : 0U;
+
     key_init(CONTROL_TASK_PERIOD_MS);
+
     motor_init();
+
     encoder_quad_init(ENCODER_LEFT_INDEX, ENCODER_LEFT_CH1, ENCODER_LEFT_CH2);
     encoder_quad_init(ENCODER_RIGHT_INDEX, ENCODER_RIGHT_CH1, ENCODER_RIGHT_CH2);
     encoder_clear_count(ENCODER_LEFT_INDEX);
     encoder_clear_count(ENCODER_RIGHT_INDEX);
+
     g_imu_data_ready_sem = xSemaphoreCreateBinary();
 
-    taskENTER_CRITICAL();
     xTaskCreate(state_task, "state_task", STATE_TASK_STACK_SIZE, NULL, STATE_TASK_PRIORITY, &stateTaskHandle);
     xTaskCreate(decision_task, "decision_task", DECISION_TASK_STACK_SIZE, NULL, DECISION_TASK_PRIORITY, &decisionTaskHandle);
     xTaskCreate(estimate_task, "estimate_task", ESTIMATE_TASK_STACK_SIZE, NULL, ESTIMATE_TASK_PRIORITY, &estimateTaskHnadle);
