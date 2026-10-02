@@ -1,7 +1,10 @@
-#include "zf_common_headfile.h"
-#include "general_include.h"
+#include "send_task.h"
 
-static const uint8 test_frame[] = {0xAA, 0x55, 0x01, 0x00, 0x01, 0xFE};
+#include "app_serial.h"
+#include "general_define.h"
+#include "FreeRTOS.h"
+#include "task.h"
+#include "task_metrics.h"
 
 void send_task(void *pvParameters)
 {
@@ -11,8 +14,7 @@ void send_task(void *pvParameters)
     for (;;)
     {
         uint32_t metric_start = task_metrics_begin();
-
-        uart_write_buffer(UART_8, test_frame, sizeof(test_frame));
+        app_serial_send();
         task_metrics_end(TASK_METRIC_SEND, metric_start);
         vTaskDelayUntil(&last_wake_tick, pdMS_TO_TICKS(SEND_TASK_PERIOD_MS));
     }

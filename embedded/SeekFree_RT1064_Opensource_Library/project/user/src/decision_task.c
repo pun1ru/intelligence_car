@@ -1,4 +1,9 @@
-#include "general_include.h"
+#include "decision_task.h"
+
+#include "FreeRTOS.h"
+#include "general_define.h"
+#include "task.h"
+#include "task_metrics.h"
 
 void decision_task(void *pvParameters)
 {

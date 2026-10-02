@@ -1,119 +1,76 @@
-#include "zf_common_headfile.h"
+#include "initial_task.h"
+
+#include "app_system.h"
+#include "control_task.h"
+#include "debug_task.h"
+#include "decision_task.h"
+#include "estimate_task.h"
 #include "general_define.h"
-#include "general_include.h"
 #include "receive_task.h"
+#include "send_task.h"
+#include "state_task.h"
+#include "task.h"
+#include "task_metrics.h"
 
-TaskHandle_t stateTaskHandle;
-TaskHandle_t decisionTaskHandle;
-TaskHandle_t estimateTaskHnadle;
-TaskHandle_t controlTaskHandle;
-TaskHandle_t receiveTaskHandel;
-TaskHandle_t sendTaskHandle;
-TaskHandle_t debugTaskHandle;
+static TaskHandle_t state_task_handle;
+static TaskHandle_t decision_task_handle;
+static TaskHandle_t estimate_task_handle;
+static TaskHandle_t control_task_handle;
+static TaskHandle_t receive_task_handle;
+static TaskHandle_t send_task_handle;
+static TaskHandle_t debug_task_handle;
 
-static volatile uint8 buzzer_fast_running;
-
-static void motor_init(void)//电机初始化
+static void delete_created_tasks(void)
 {
-    gpio_init(MOTOR_LEFT_DIR, GPO, GPIO_LOW, GPO_PUSH_PULL);
-    gpio_init(MOTOR_RIGHT_DIR, GPO, GPIO_LOW, GPO_PUSH_PULL);
-    pwm_init(MOTOR_LEFT_PWM, MOTOR_PWM_FREQUENCY_HZ, 0U);
-    pwm_init(MOTOR_RIGHT_PWM, MOTOR_PWM_FREQUENCY_HZ, 0U);
-}
-
-void buzzer_init(void)//蜂鸣器初始化
-{
-    gpio_init(B11, GPO, GPIO_LOW, GPO_PUSH_PULL);
-}
-
-void buzzer_stop(void)
-{
-    buzzer_fast_running = 0U;
-    gpio_set_level(B11, GPIO_LOW);
-}
-
-static void buzzer_pulse(void)
-{
-    gpio_set_level(B11, GPIO_HIGH);
-    system_delay_ms(200U);
-    gpio_set_level(B11, GPIO_LOW);
-}
-
-void buzzer_play(buzzer_mode_t mode)
-{
-    uint8 count;
-
-    buzzer_init();
-    if (mode == BUZZER_MODE_FAST_CONTINUOUS)
+    TaskHandle_t *handles[] =
     {
-        buzzer_fast_running = 1U;
-        while (buzzer_fast_running != 0U)
+        &state_task_handle, &decision_task_handle, &estimate_task_handle,
+        &control_task_handle, &receive_task_handle, &send_task_handle,
+        &debug_task_handle
+    };
+    uint8_t index;
+
+    for (index = 0U; index < (sizeof(handles) / sizeof(handles[0])); index++)
+    {
+        if (*handles[index] != NULL)
         {
-            gpio_set_level(B11, GPIO_HIGH);
-            system_delay_ms(50U);
-            gpio_set_level(B11, GPIO_LOW);
-            system_delay_ms(50U);
-        }
-        return;
-    }
-
-    count = (uint8)mode;
-    if (count > 4U)
-    {
-        count = 1U;
-    }
-    while (count-- > 0U)
-    {
-        buzzer_pulse();
-        if (count > 0U)
-        {
-            system_delay_ms(100U);
+            vTaskDelete(*handles[index]);
+            *handles[index] = NULL;
         }
     }
 }
-
-void buzzer_beep_once(void) { buzzer_play(BUZZER_MODE_ONCE); }
-void buzzer_beep_twice(void) { buzzer_play(BUZZER_MODE_TWICE); }
-void buzzer_beep_three(void) { buzzer_play(BUZZER_MODE_THREE); }
-void buzzer_beep_four(void) { buzzer_play(BUZZER_MODE_FOUR); }
-void buzzer_beep_fast(void) { buzzer_play(BUZZER_MODE_FAST_CONTINUOUS); }
 
 void initial_task(void *pvParameters)
 {
-    taskENTER_CRITICAL();
     uint32_t metric_start;
-    uint8 imu_init_status;
 
     (void)pvParameters;
-
     metric_start = task_metrics_begin();
+    app_system_devices_init(CONTROL_TASK_PERIOD_MS);
+    if (receive_data_init() == 0U)
+    {
+        task_metrics_end(TASK_METRIC_INITIAL, metric_start);
+        vTaskDelete(NULL);
+        return;
+    }
 
-    buzzer_beep_once();
-
-    uart_init(UART_8, 115200U, UART8_TX_D16, UART8_RX_D17);
-
-    imu_init_status = imu660rc_init(IMU660RC_QUARTERNION_DISABLE);
-    g_imu_receive_data.imu_ready = (imu_init_status == 0U) ? 1U : 0U;
-
-    key_init(CONTROL_TASK_PERIOD_MS);
-
-    motor_init();
-
-    encoder_quad_init(ENCODER_LEFT_INDEX, ENCODER_LEFT_CH1, ENCODER_LEFT_CH2);
-    encoder_quad_init(ENCODER_RIGHT_INDEX, ENCODER_RIGHT_CH1, ENCODER_RIGHT_CH2);
-    encoder_clear_count(ENCODER_LEFT_INDEX);
-    encoder_clear_count(ENCODER_RIGHT_INDEX);
-
-    g_imu_data_ready_sem = xSemaphoreCreateBinary();
-
-    xTaskCreate(state_task, "state_task", STATE_TASK_STACK_SIZE, NULL, STATE_TASK_PRIORITY, &stateTaskHandle);
-    xTaskCreate(decision_task, "decision_task", DECISION_TASK_STACK_SIZE, NULL, DECISION_TASK_PRIORITY, &decisionTaskHandle);
-    xTaskCreate(estimate_task, "estimate_task", ESTIMATE_TASK_STACK_SIZE, NULL, ESTIMATE_TASK_PRIORITY, &estimateTaskHnadle);
-    xTaskCreate(control_task, "control_task", CONTROL_TASK_STACK_SIZE, NULL, CONTROL_TASK_PRIORITY, &controlTaskHandle);
-    xTaskCreate(receive_task, "receive_task", RECEIVE_TASK_STACK_SIZE, NULL, RECEIVE_TASK_PRIORITY, &receiveTaskHandel);
-    xTaskCreate(send_task, "send_task", SEND_TASK_STACK_SIZE, NULL, SEND_TASK_PRIORITY, &sendTaskHandle);
-    xTaskCreate(debug_task, DEBUG_TASK_NAME, DEBUG_TASK_STACK_SIZE, NULL, DEBUG_TASK_PRIORITY, &debugTaskHandle);
-    taskEXIT_CRITICAL();
+    if ((xTaskCreate(state_task, STATE_TASK_NAME, STATE_TASK_STACK_SIZE,
+                     NULL, STATE_TASK_PRIORITY, &state_task_handle) != pdPASS) ||
+        (xTaskCreate(decision_task, DECISION_TASK_NAME, DECISION_TASK_STACK_SIZE,
+                     NULL, DECISION_TASK_PRIORITY, &decision_task_handle) != pdPASS) ||
+        (xTaskCreate(estimate_task, ESTIMATE_TASK_NAME, ESTIMATE_TASK_STACK_SIZE,
+                     NULL, ESTIMATE_TASK_PRIORITY, &estimate_task_handle) != pdPASS) ||
+        (xTaskCreate(control_task, CONTROL_TASK_NAME, CONTROL_TASK_STACK_SIZE,
+                     NULL, CONTROL_TASK_PRIORITY, &control_task_handle) != pdPASS) ||
+        (xTaskCreate(receive_task, RECEIVE_TASK_NAME, RECEIVE_TASK_STACK_SIZE,
+                     NULL, RECEIVE_TASK_PRIORITY, &receive_task_handle) != pdPASS) ||
+        (xTaskCreate(send_task, SEND_TASK_NAME, SEND_TASK_STACK_SIZE,
+                     NULL, SEND_TASK_PRIORITY, &send_task_handle) != pdPASS) ||
+        (xTaskCreate(debug_task, DEBUG_TASK_NAME, DEBUG_TASK_STACK_SIZE,
+                     NULL, DEBUG_TASK_PRIORITY, &debug_task_handle) != pdPASS))
+    {
+        delete_created_tasks();
+    }
 
     task_metrics_end(TASK_METRIC_INITIAL, metric_start);
     vTaskDelete(NULL);

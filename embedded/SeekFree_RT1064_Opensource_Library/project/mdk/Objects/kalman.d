@@ -1,7 +1,7 @@
 ./objects/kalman.o: ..\..\libraries\myAlgorithm\kalman\kalman.c \
   ..\..\libraries\myAlgorithm\kalman\kalman.h \
+  C:\Keil_v5\ARM\ARMCLANG\Bin\..\include\stddef.h \
   C:\Keil_v5\ARM\ARMCLANG\Bin\..\include\math.h \
-  C:\Keil_v5\ARM\ARMCLANG\Bin\..\include\stdlib.h \
   ..\..\libraries\sdk\CMSIS\DSP\Include\arm_math.h \
   ..\..\libraries\sdk\CMSIS\DSP\Include\arm_math_types.h \
   ..\..\libraries\sdk\CMSIS\Include\cmsis_compiler.h \
@@ -30,13 +30,4 @@
   ..\..\libraries\sdk\CMSIS\DSP\Include\dsp\transform_functions.h \
   ..\..\libraries\sdk\CMSIS\DSP\Include\dsp\filtering_functions.h \
   ..\..\libraries\sdk\CMSIS\DSP\Include\dsp\quaternion_math_functions.h \
-  ..\..\libraries\Freertos\include\FreeRTOS.h \
-  C:\Keil_v5\ARM\ARMCLANG\Bin\..\include\stddef.h \
-  ..\..\libraries\Freertos\FreeRTOSConfig.h \
-  ..\..\libraries\Freertos\include\projdefs.h \
-  ..\..\libraries\Freertos\include\portable.h \
-  ..\..\libraries\Freertos\include\deprecated_definitions.h \
-  ..\..\libraries\Freertos\portable\GCC\ARM_CM7\r0p1\portmacro.h \
-  ..\..\libraries\Freertos\include\mpu_wrappers.h \
-  ..\..\libraries\Freertos\include\task.h \
-  ..\..\libraries\Freertos\include\list.h
+  C:\Keil_v5\ARM\ARMCLANG\Bin\..\include\stdlib.h

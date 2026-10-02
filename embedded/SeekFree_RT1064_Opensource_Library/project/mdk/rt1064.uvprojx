@@ -341,7 +341,7 @@
               <MiscControls>-fno-common  -fdata-sections  -ffreestanding  -fno-builtin  -mthumb -Wno-invalid-source-encoding</MiscControls>
               <Define>CPU_MIMXRT1064DVL6A,SKIP_SYSCLK_INIT,XIP_EXTERNAL_FLASH=1, XIP_BOOT_HEADER_DCD_ENABLE =1, XIP_BOOT_HEADER_ENABLE =1,PRINTF_FLOAT_ENABLE=1, SCANF_FLOAT_ENABLE=1, PRINTF_ADVANCED_ENABLE=1, SCANF_ADVANCED_ENABLE=1, FSL_DRIVER_TRANSFER_DOUBLE_WEAK_IRQ=0, USB_STACK_BM, SDK_OS_FREE_RTOS, DEBUG, MCUXPRESSO_SDK, SD_ENABLED</Define>
               <Undefine></Undefine>
-              <IncludePath>..\user\inc;..\code;..\..\libraries\Freertos;..\..\libraries\Freertos\include;..\..\libraries\Freertos\portable\GCC\ARM_CM7\r0p1;..\..\libraries\Freertos\osa;..\..\libraries\sdk\CMSIS\DSP\Include;..\..\libraries\sdk\CMSIS\DSP\PrivateInclude;..\..\libraries\sdk\startup\mdk;..\..\libraries\sdk\deceive;..\..\libraries\sdk\drives;..\..\libraries\sdk\xip;..\..\libraries\sdk\utilities;..\..\libraries\sdk\utilities\debug_console;..\..\libraries\sdk\utilities\str;..\..\libraries\sdk\cmsis_drivers;..\..\libraries\sdk\CMSIS\Include;..\..\libraries\sdk\CMSIS\Driver\Include;..\..\libraries\sdk\components\lists;..\..\libraries\sdk\components\osa;..\..\libraries\sdk\components\serial_manager;..\..\libraries\sdk\components\uart;..\..\libraries\sdk\board;..\..\libraries\components\fatfs\source;..\..\libraries\components\fatfs\source\fsl_sd_disk;..\..\libraries\components\sdmmc;..\..\libraries\components\sdmmc\common;..\..\libraries\components\sdmmc\host\usdhc;..\..\libraries\components\sdmmc\osa;..\..\libraries\components\sdmmc\sd;..\..\libraries\components\usb\device;..\..\libraries\components\usb\include;..\..\libraries\components\usb\phy;..\..\libraries\components\usb\usb_cdc_adapter;..\..\libraries\zf_common;..\..\libraries\zf_driver;..\..\libraries\zf_device;..\..\libraries\zf_components;..\..\libraries\myAlgorithm;..\..\libraries\myAlgorithm\EKF;..\..\libraries\myAlgorithm\kalman;..\..\libraries\myAlgorithm\lqr;..\..\libraries\myAlgorithm\pid</IncludePath>
+              <IncludePath>..\user\inc;..\code;..\..\libraries\Freertos;..\..\libraries\Freertos\include;..\..\libraries\Freertos\portable\GCC\ARM_CM7\r0p1;..\..\libraries\Freertos\osa;..\..\libraries\sdk\CMSIS\DSP\Include;..\..\libraries\sdk\CMSIS\DSP\PrivateInclude;..\..\libraries\sdk\startup\mdk;..\..\libraries\sdk\deceive;..\..\libraries\sdk\drives;..\..\libraries\sdk\xip;..\..\libraries\sdk\utilities;..\..\libraries\sdk\utilities\debug_console;..\..\libraries\sdk\utilities\str;..\..\libraries\sdk\cmsis_drivers;..\..\libraries\sdk\CMSIS\Include;..\..\libraries\sdk\CMSIS\Driver\Include;..\..\libraries\sdk\components\lists;..\..\libraries\sdk\components\osa;..\..\libraries\sdk\components\serial_manager;..\..\libraries\sdk\components\uart;..\..\libraries\sdk\board;..\..\libraries\components\fatfs\source;..\..\libraries\components\fatfs\source\fsl_sd_disk;..\..\libraries\components\sdmmc;..\..\libraries\components\sdmmc\common;..\..\libraries\components\sdmmc\host\usdhc;..\..\libraries\components\sdmmc\osa;..\..\libraries\components\sdmmc\sd;..\..\libraries\components\usb\device;..\..\libraries\components\usb\include;..\..\libraries\components\usb\phy;..\..\libraries\components\usb\usb_cdc_adapter;..\..\libraries\zf_common;..\..\libraries\zf_driver;..\..\libraries\zf_device;..\..\libraries\zf_components;..\..\libraries\myAlgorithm;..\..\libraries\myAlgorithm\EKF;..\..\libraries\myAlgorithm\kalman;..\..\libraries\myAlgorithm\lqr;..\..\libraries\myAlgorithm\pid;..\..\libraries\myApplication\system;..\..\libraries\myApplication\sensor;..\..\libraries\myApplication\motion;..\..\libraries\myApplication\interaction;..\..\libraries\myApplication\state;..\..\libraries\myApplication\communication;..\..\libraries\myDriver;..\..\libraries\myAlgorithm\statistics</IncludePath>
             </VariousControls>
           </Cads>
           <Aads>
@@ -406,9 +406,9 @@
               <FilePath>..\user\src\decision_task.c</FilePath>
             </File>
             <File>
-              <FileName>esimate_task.c</FileName>
+              <FileName>estimate_task.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\user\src\esimate_task.c</FilePath>
+              <FilePath>..\user\src\estimate_task.c</FilePath>
             </File>
             <File>
               <FileName>initial_task.c</FileName>
@@ -431,9 +431,14 @@
               <FilePath>..\user\src\state_task.c</FilePath>
             </File>
             <File>
-              <FileName>debugtask.c</FileName>
+              <FileName>debug_task.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\user\src\debugtask.c</FilePath>
+              <FilePath>..\user\src\debug_task.c</FilePath>
+            </File>
+            <File>
+              <FileName>task_metrics.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\user\src\task_metrics.c</FilePath>
             </File>
           </Files>
         </Group>
@@ -456,6 +461,11 @@
               <FilePath>..\user\inc\decision_task.h</FilePath>
             </File>
             <File>
+              <FileName>debug_task.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\user\inc\debug_task.h</FilePath>
+            </File>
+            <File>
               <FileName>estimate_task.h</FileName>
               <FileType>5</FileType>
               <FilePath>..\user\inc\estimate_task.h</FilePath>
@@ -464,11 +474,6 @@
               <FileName>general_define.h</FileName>
               <FileType>5</FileType>
               <FilePath>..\user\inc\general_define.h</FilePath>
-            </File>
-            <File>
-              <FileName>general_include.h</FileName>
-              <FileType>5</FileType>
-              <FilePath>..\user\inc\general_include.h</FilePath>
             </File>
             <File>
               <FileName>initial_task.h</FileName>
@@ -1146,6 +1151,196 @@
           </Files>
         </Group>
         <Group>
+          <GroupName>myApplication_system</GroupName>
+          <Files>
+            <File>
+              <FileName>app_system.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\libraries\myApplication\system\app_system.c</FilePath>
+            </File>
+            <File>
+              <FileName>app_system.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\..\libraries\myApplication\system\app_system.h</FilePath>
+            </File>
+          </Files>
+        </Group>
+        <Group>
+          <GroupName>myApplication_sensor</GroupName>
+          <Files>
+            <File>
+              <FileName>app_sensor.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\libraries\myApplication\sensor\app_sensor.c</FilePath>
+            </File>
+            <File>
+              <FileName>app_sensor.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\..\libraries\myApplication\sensor\app_sensor.h</FilePath>
+            </File>
+            <File>
+              <FileName>app_attitude.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\libraries\myApplication\sensor\app_attitude.c</FilePath>
+            </File>
+            <File>
+              <FileName>app_attitude.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\..\libraries\myApplication\sensor\app_attitude.h</FilePath>
+            </File>
+            <File>
+              <FileName>app_calibration.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\libraries\myApplication\sensor\app_calibration.c</FilePath>
+            </File>
+            <File>
+              <FileName>app_calibration.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\..\libraries\myApplication\sensor\app_calibration.h</FilePath>
+            </File>
+            <File>
+              <FileName>app_encoder.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\libraries\myApplication\sensor\app_encoder.c</FilePath>
+            </File>
+            <File>
+              <FileName>app_encoder.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\..\libraries\myApplication\sensor\app_encoder.h</FilePath>
+            </File>
+          </Files>
+        </Group>
+        <Group>
+          <GroupName>myApplication_motion</GroupName>
+          <Files>
+            <File>
+              <FileName>app_control.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\libraries\myApplication\motion\app_control.c</FilePath>
+            </File>
+            <File>
+              <FileName>app_control.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\..\libraries\myApplication\motion\app_control.h</FilePath>
+            </File>
+            <File>
+              <FileName>app_balance.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\libraries\myApplication\motion\app_balance.c</FilePath>
+            </File>
+            <File>
+              <FileName>app_balance.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\..\libraries\myApplication\motion\app_balance.h</FilePath>
+            </File>
+          </Files>
+        </Group>
+        <Group>
+          <GroupName>myApplication_interaction</GroupName>
+          <Files>
+            <File>
+              <FileName>app_buzzer.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\libraries\myApplication\interaction\app_buzzer.c</FilePath>
+            </File>
+            <File>
+              <FileName>app_buzzer.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\..\libraries\myApplication\interaction\app_buzzer.h</FilePath>
+            </File>
+            <File>
+              <FileName>app_display.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\libraries\myApplication\interaction\app_display.c</FilePath>
+            </File>
+            <File>
+              <FileName>app_display.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\..\libraries\myApplication\interaction\app_display.h</FilePath>
+            </File>
+          </Files>
+        </Group>
+        <Group>
+          <GroupName>myApplication_state</GroupName>
+          <Files>
+            <File>
+              <FileName>app_state.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\libraries\myApplication\state\app_state.c</FilePath>
+            </File>
+            <File>
+              <FileName>app_state.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\..\libraries\myApplication\state\app_state.h</FilePath>
+            </File>
+          </Files>
+        </Group>
+        <Group>
+          <GroupName>myApplication_communication</GroupName>
+          <Files>
+            <File>
+              <FileName>app_serial.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\libraries\myApplication\communication\app_serial.c</FilePath>
+            </File>
+            <File>
+              <FileName>app_serial.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\..\libraries\myApplication\communication\app_serial.h</FilePath>
+            </File>
+          </Files>
+        </Group>
+        <Group>
+          <GroupName>myDriver</GroupName>
+          <Files>
+            <File>
+              <FileName>drv_imu.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\libraries\myDriver\drv_imu.c</FilePath>
+            </File>
+            <File>
+              <FileName>drv_io.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\libraries\myDriver\drv_io.c</FilePath>
+            </File>
+            <File>
+              <FileName>drv_motion.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\libraries\myDriver\drv_motion.c</FilePath>
+            </File>
+            <File>
+              <FileName>drv_imu.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\..\libraries\myDriver\drv_imu.h</FilePath>
+            </File>
+            <File>
+              <FileName>drv_io.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\..\libraries\myDriver\drv_io.h</FilePath>
+            </File>
+            <File>
+              <FileName>drv_motion.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\..\libraries\myDriver\drv_motion.h</FilePath>
+            </File>
+          </Files>
+        </Group>
+        <Group>
+          <GroupName>myAlgorithm_statistics</GroupName>
+          <Files>
+            <File>
+              <FileName>running_stats.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\libraries\myAlgorithm\statistics\running_stats.c</FilePath>
+            </File>
+            <File>
+              <FileName>running_stats.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\..\libraries\myAlgorithm\statistics\running_stats.h</FilePath>
+            </File>
+          </Files>
+        </Group>
+        <Group>
           <GroupName>myAlgorithm_EKF</GroupName>
           <Files>
             <File>
@@ -1202,6 +1397,16 @@
               <FileName>pid.h</FileName>
               <FileType>5</FileType>
               <FilePath>..\..\libraries\myAlgorithm\pid\pid.h</FilePath>
+            </File>
+            <File>
+              <FileName>control_pid.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\libraries\myAlgorithm\pid\control_pid.c</FilePath>
+            </File>
+            <File>
+              <FileName>control_pid.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\..\libraries\myAlgorithm\pid\control_pid.h</FilePath>
             </File>
           </Files>
         </Group>

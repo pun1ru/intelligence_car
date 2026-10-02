@@ -20,7 +20,6 @@ typedef struct {
     KalmanFilter_t IMU_QuaternionEKF;
     uint8_t ConvergeFlag;
     uint8_t StableFlag;
-    uint64_t ErrorCount;
     uint64_t UpdateCount;
     //7维状态变量
     float q[4];
@@ -42,6 +41,8 @@ typedef struct {
     float GyroNoiseVariance[3];
     uint8_t GyroNoiseCalibrated;
     float AccelNoiseVariance[3];
+    float AccelLpfAlpha;
+    float CorrectionLimit;
 
     //加速度量测噪声
     float R;
@@ -58,10 +59,16 @@ typedef struct {
     float lambda; 
 }QEKF_INS_t;
 
-extern QEKF_INS_t QEKF_INS;
 void IMU_QuaternionEKF_Init(float process_noise1, float process_noise2, float measure_noise, float lambda,
                              float gyro_noise_x_dps2, float gyro_noise_y_dps2, float gyro_noise_z_dps2,
                              float accel_noise_x_norm2, float accel_noise_y_norm2, float accel_noise_z_norm2);
 void IMU_QuaternionEKF_Update(float gx, float gy, float gz, float ax, float ay, float az, float dt);
+void IMU_QuaternionEKF_Reset(void);
+void IMU_QuaternionEKF_SetNoise(const float gyro_noise_dps2[3],
+                                 const float accel_noise_norm2[3]);
+void IMU_QuaternionEKF_SetAccelFilter(float alpha, float chi_square_limit,
+                                      float correction_limit);
+void IMU_QuaternionEKF_GetAttitude(float quaternion[4], float *roll,
+                                   float *pitch, float *yaw);
 
 #endif

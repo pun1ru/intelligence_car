@@ -11,7 +11,13 @@ embedded/SeekFree_RT1064_Opensource_Library/
 │   └── src/                     任务实现、main.c、isr.c
 └── libraries/
     ├── myAlgorithm/             自有算法层：PID、滤波、估计、数学运算等
-    ├── myApplication/           自有应用层：车辆功能、状态机、控制流程
+    ├── myApplication/           自有应用层，按业务模块分目录
+    │   ├── system/              系统启动和模块初始化
+    │   ├── sensor/              IMU、编码器采样及姿态估计、校准
+    │   ├── motion/              轮电机控制流程
+    │   ├── interaction/         蜂鸣器和屏幕显示
+    │   ├── state/               车辆状态机（当前待实现）
+    │   └── communication/       串口通信
     ├── myDriver/                自有驱动层：板级设备与逐飞接口适配
     ├── zf_common/               逐飞公共库
     ├── zf_driver/               逐飞芯片外设驱动
@@ -60,15 +66,17 @@ Task ──使用──> FreeRTOS（调度与通信）
 
 ## 4. 文件划分与新增模块
 
-- 一个模块集中管理一个职责，并拥有同名 `.h/.c`。例如 `myDriver/drv_motor.h/.c` 封装电机引脚和 PWM，`myApplication/app_vehicle_control.h/.c` 组合速度控制，`myAlgorithm/pid/pid.h/.c` 实现 PID。新增子目录按设备、业务或算法划分，不混放不同层的文件。
+- 一个模块集中管理一个职责，并拥有同名 `.h/.c`。例如 `myDriver/drv_motion.h/.c` 封装电机与编码器，`myApplication/motion/app_control.h/.c` 负责控制动作，`myAlgorithm/pid/pid.h/.c` 实现 PID。Application 仅按上述业务域分目录，暂不为 IMU、编码器、蜂鸣器等设备再建子目录。
 - 对外头文件只暴露该层接口；私有状态和逐飞头文件尽量留在 `.c`。Application 头文件使用普通 C 数据类型，避免迫使 Task 间接包含整个逐飞库；Algorithm 头文件保持可在主机环境编译。
 - 新建自有 `.c/.h` 后，把源码加入 `project/mdk/rt1064.uvprojx` 对应分组，并更新必要的 include path；仅创建文件不会自动加入 Keil 构建。分组名与目录层次保持一致。
-- `project/user/inc` 放任务入口、任务配置以及任务通信声明；任务实现放 `project/user/src`。业务配置归所属 Application，硬件引脚和设备配置归 Driver，不集中堆到 `general_define.h`。
+- `project/user/inc` 放任务入口、任务配置以及任务通信声明；任务实现放 `project/user/src`。当前工程统一将可调设定量放在 `general_define.h`。该头文件只定义常量，不得引入 Task 接口或运行时依赖；Driver/Application 可以读取这些配置宏。
 
-## 5. 现状与迁移顺序
+## 5. 当前实现与后续检查
 
-当前 `myApplication` 和 `myDriver` 尚无源码。`control_task.c` 中有 GPIO/PWM 操作，`initial_task.c` 中有设备初始化；部分 `myAlgorithm` 文件也直接包含 FreeRTOS。它们是现有实现，不代表目标依赖规则已经满足。
+当前板级外设访问集中在 `myDriver`。`myApplication` 的系统、传感器、运动、交互外设、通信和状态目录均已有实现。屏幕输出由 `interaction/app_display` 管理，串口帧由 `communication/app_serial` 管理。`receive_task` 用长度为 1 的 FreeRTOS 队列发布 IMU、编码器和姿态快照；`estimate_task` 由信号量唤醒。任务运行统计独立放在 `project/user/src/task_metrics.c`。Kalman 算法通过调用方提供的分配器获取内存，算法头文件不再包含 FreeRTOS。
 
-后续修改相关功能时，优先按以下顺序迁移：先将板级操作封装到 `myDriver`，再把控制流程放到 `myApplication`，最后让 Task 只保留调度、通信和 Application 调用。算法中的 RTOS/硬件依赖可通过显式参数、调用者提供的缓冲区和适配接口逐步移除。每一步保持可编译、可回退，并通过板上行为核对。
+`state_task` 与 `decision_task` 目前仍为空任务框架，`app_control` 仍执行原有的开关控制电机测试动作。新的编码器物理量换算、轮速闭环、平衡角度/速度串级控制、串口命令解析和车辆状态机已独立实现，尚未接入 Task；当前固件不会执行这些新控制动作。
+
+校准函数由调用任务调度时间窗口，只能从非 `receive_task` 的任务上下文调用；统计计算在 Application/Algorithm 完成。校准结果读取若与更新并发，调用方需要在 Task 层做好同步。姿态估计仍沿用 1 ms 固定更新步长和原有 EKF 初始化参数，实际采样间隔、任务负载及传感器失效后的行为需要上板验证。
 
 新增模块评审时检查：文件是否位于所属层、头文件是否泄漏上层/第三方类型、依赖图是否有环、任务是否仅处理调度与通信、异常时执行器是否进入安全状态。

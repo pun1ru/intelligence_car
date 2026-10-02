@@ -128,8 +128,18 @@
  */
 
 #include "kalman.h"
+#include <stdlib.h>
 
 uint16_t sizeof_float, sizeof_double;
+
+static void *(*kalman_allocate)(size_t) = malloc;
+
+void Kalman_Filter_SetAllocator(void *(*allocate)(size_t))
+{
+    kalman_allocate = (allocate != NULL) ? allocate : malloc;
+}
+
+#define user_malloc kalman_allocate
 
 static void H_K_R_Adjustment(KalmanFilter_t *kf);
 
@@ -169,9 +179,7 @@ void Kalman_Filter_Init(KalmanFilter_t *kf, uint8_t xhatSize, uint8_t uSize, uin
     memset(kf->FilteredValue, 0, sizeof_float * xhatSize);
     kf->MeasuredVector = (float *)user_malloc(sizeof_float * zSize);
     memset(kf->MeasuredVector, 0, sizeof_float * zSize);
-    /* A zero-dimensional control input has no storage to allocate.  Calling
-     * pvPortMalloc(0) returns NULL and invokes the malloc-failed hook in this
-     * FreeRTOS heap implementation. */
+    /* A zero-dimensional control input has no storage to allocate. */
     kf->ControlVector = NULL;
     if (uSize != 0)
     {

@@ -1,247 +1,202 @@
-#include "zf_common_headfile.h"
-#include "general_include.h"
 #include "receive_task.h"
-#include <math.h>
 
-volatile imu_receive_data_t g_imu_receive_data;
+#include "app_calibration.h"
+#include "app_sensor.h"
+#include "general_define.h"
+#include "queue.h"
+#include "task.h"
+#include "task_metrics.h"
+
 SemaphoreHandle_t g_imu_data_ready_sem;
-volatile imu_gyro_calibration_t g_imu_gyro_calibration;
-volatile imu_accel_calibration_t g_imu_accel_calibration;
-volatile encoder_receive_data_t g_encoder_receive_data;
+
+static QueueHandle_t imu_sample_queue;
+static QueueHandle_t attitude_queue;
+static QueueHandle_t encoder_queue;
+static TickType_t attitude_publish_tick;
+
+uint8_t receive_data_init(void)
+{
+    imu_sample_queue = xQueueCreate(1U, sizeof(app_imu_sample_t));
+    attitude_queue = xQueueCreate(1U, sizeof(app_attitude_t));
+    encoder_queue = xQueueCreate(1U, sizeof(app_encoder_sample_t));
+    g_imu_data_ready_sem = xSemaphoreCreateBinary();
+
+    if ((imu_sample_queue == NULL) || (attitude_queue == NULL) ||
+        (encoder_queue == NULL) || (g_imu_data_ready_sem == NULL))
+    {
+        if (imu_sample_queue != NULL)
+        {
+            vQueueDelete(imu_sample_queue);
+            imu_sample_queue = NULL;
+        }
+        if (attitude_queue != NULL)
+        {
+            vQueueDelete(attitude_queue);
+            attitude_queue = NULL;
+        }
+        if (encoder_queue != NULL)
+        {
+            vQueueDelete(encoder_queue);
+            encoder_queue = NULL;
+        }
+        if (g_imu_data_ready_sem != NULL)
+        {
+            vSemaphoreDelete(g_imu_data_ready_sem);
+            g_imu_data_ready_sem = NULL;
+        }
+        return 0U;
+    }
+    return 1U;
+}
+
+uint8_t receive_imu_snapshot(app_imu_sample_t *sample)
+{
+    if ((sample == NULL) || (imu_sample_queue == NULL))
+    {
+        return 0U;
+    }
+    return (xQueuePeek(imu_sample_queue, sample, 0U) == pdTRUE) ? 1U : 0U;
+}
+
+uint8_t receive_display_snapshot(app_attitude_t *attitude,
+                                 app_encoder_sample_t *encoder)
+{
+    if ((attitude == NULL) || (encoder == NULL) ||
+        (attitude_queue == NULL) || (encoder_queue == NULL))
+    {
+        return 0U;
+    }
+    if (xQueuePeek(attitude_queue, attitude, 0U) != pdTRUE)
+    {
+        return 0U;
+    }
+    return (xQueuePeek(encoder_queue, encoder, 0U) == pdTRUE) ? 1U : 0U;
+}
+
+uint8_t receive_attitude_snapshot(app_attitude_t *attitude)
+{
+    if ((attitude == NULL) || (attitude_queue == NULL) ||
+        (xQueuePeek(attitude_queue, attitude, 0U) != pdTRUE))
+    {
+        return 0U;
+    }
+    return ((xTaskGetTickCount() - attitude_publish_tick) <=
+            pdMS_TO_TICKS(VEHICLE_ATTITUDE_TIMEOUT_MS)) ? 1U : 0U;
+}
+
+void receive_publish_attitude(const app_attitude_t *attitude)
+{
+    if ((attitude != NULL) && (attitude_queue != NULL))
+    {
+        (void)xQueueOverwrite(attitude_queue, attitude);
+        attitude_publish_tick = xTaskGetTickCount();
+    }
+}
+
+static void calibration_wait_for_imu(TickType_t *last_wake_tick)
+{
+    app_imu_sample_t sample;
+
+    while ((app_sensor_imu_ready() == 0U) ||
+           (receive_imu_snapshot(&sample) == 0U))
+    {
+        vTaskDelayUntil(last_wake_tick, pdMS_TO_TICKS(RECEIVE_TASK_PERIOD_MS));
+    }
+}
 
 void imu_accel_noise_calibrate(void)
 {
     TickType_t last_wake_tick = xTaskGetTickCount();
     TickType_t start_tick;
-    TickType_t calibration_ticks = pdMS_TO_TICKS(IMU_ACCEL_CALIBRATION_TIME_MS);
-    float mean[3] = {0.0f, 0.0f, 0.0f};
-    float m2[3] = {0.0f, 0.0f, 0.0f};
-    uint32_t source_sample_count;
-    uint32_t last_source_sample_count;
-    uint32_t sample_count = 0U;
-    uint8 axis;
+    app_imu_sample_t sample;
+    uint32_t last_sample_count;
 
-    g_imu_accel_calibration.active = 1U;
-    g_imu_accel_calibration.complete = 0U;
-    g_imu_accel_calibration.sample_count = 0U;
-    for (axis = 0U; axis < 3U; axis++)
-    {
-        g_imu_accel_calibration.mean_norm[axis] = 0.0f;
-        g_imu_accel_calibration.noise_variance_norm2[axis] = 0.0f;
-        g_imu_accel_calibration.noise_stddev_norm[axis] = 0.0f;
-    }
-
-    while (g_imu_receive_data.imu_ready == 0U)
-    {
-        vTaskDelayUntil(&last_wake_tick, pdMS_TO_TICKS(RECEIVE_TASK_PERIOD_MS));
-    }
-
+    app_calibration_accel_start();
+    calibration_wait_for_imu(&last_wake_tick);
+    (void)receive_imu_snapshot(&sample);
+    last_sample_count = sample.sample_count;
     start_tick = xTaskGetTickCount();
-    last_source_sample_count = g_imu_receive_data.sample_count;
-    while ((xTaskGetTickCount() - start_tick) < calibration_ticks)
+
+    while ((xTaskGetTickCount() - start_tick) <
+           pdMS_TO_TICKS(IMU_ACCEL_CALIBRATION_TIME_MS))
     {
-        source_sample_count = g_imu_receive_data.sample_count;
-        if (source_sample_count != last_source_sample_count)
+        if ((receive_imu_snapshot(&sample) != 0U) &&
+            (sample.sample_count != last_sample_count))
         {
-            float norm = sqrtf(g_imu_receive_data.acc_x_g * g_imu_receive_data.acc_x_g +
-                               g_imu_receive_data.acc_y_g * g_imu_receive_data.acc_y_g +
-                               g_imu_receive_data.acc_z_g * g_imu_receive_data.acc_z_g);
-            last_source_sample_count = source_sample_count;
-
-            if (norm > 1.0e-6f && sample_count < 0xFFFFFFFFU)
-            {
-                float sample[3];
-                sample[0] = g_imu_receive_data.acc_x_g / norm;
-                sample[1] = g_imu_receive_data.acc_y_g / norm;
-                sample[2] = g_imu_receive_data.acc_z_g / norm;
-                sample_count++;
-
-                for (axis = 0U; axis < 3U; axis++)
-                {
-                    float delta = sample[axis] - mean[axis];
-                    mean[axis] += delta / (float)sample_count;
-                    m2[axis] += delta * (sample[axis] - mean[axis]);
-                }
-            }
+            last_sample_count = sample.sample_count;
+            app_calibration_accel_sample(&sample);
         }
-
         vTaskDelayUntil(&last_wake_tick, pdMS_TO_TICKS(RECEIVE_TASK_PERIOD_MS));
     }
-
-    g_imu_accel_calibration.sample_count = sample_count;
-    for (axis = 0U; axis < 3U; axis++)
-    {
-        g_imu_accel_calibration.mean_norm[axis] = mean[axis];
-        if (sample_count > 1U)
-        {
-            g_imu_accel_calibration.noise_variance_norm2[axis] =
-                m2[axis] / (float)(sample_count - 1U);
-            g_imu_accel_calibration.noise_stddev_norm[axis] =
-                sqrtf(g_imu_accel_calibration.noise_variance_norm2[axis]);
-        }
-    }
-    g_imu_accel_calibration.active = 0U;
-    g_imu_accel_calibration.complete = (sample_count > 1U) ? 1U : 0U;
+    app_calibration_accel_complete();
 }
 
 void imu_gyro_noise_calibrate(void)
 {
     TickType_t last_wake_tick = xTaskGetTickCount();
     TickType_t start_tick;
-    TickType_t calibration_ticks = pdMS_TO_TICKS(IMU_GYRO_CALIBRATION_TIME_MS);
-    TickType_t bias_ticks = calibration_ticks / 2U;
-    TickType_t noise_ticks = calibration_ticks - bias_ticks;
-    float bias_mean[3] = {0.0f, 0.0f, 0.0f};
-    float noise_mean[3] = {0.0f, 0.0f, 0.0f};
-    float noise_m2[3] = {0.0f, 0.0f, 0.0f};
-    uint32_t source_sample_count;
-    uint32_t last_source_sample_count;
-    uint32_t bias_sample_count = 0U;
-    uint32_t noise_sample_count = 0U;
-    uint8 axis;
+    TickType_t total_ticks = pdMS_TO_TICKS(IMU_GYRO_CALIBRATION_TIME_MS);
+    TickType_t bias_ticks = total_ticks / 2U;
+    app_imu_sample_t sample;
+    uint32_t last_sample_count;
 
-    g_imu_gyro_calibration.active = 1U;
-    g_imu_gyro_calibration.complete = 0U;
-    g_imu_gyro_calibration.sample_count = 0U;
-    g_imu_gyro_calibration.bias_sample_count = 0U;
-    g_imu_gyro_calibration.noise_sample_count = 0U;
-    for (axis = 0U; axis < 3U; axis++)
-    {
-        g_imu_gyro_calibration.gyro_bias_dps[axis] = 0.0f;
-        g_imu_gyro_calibration.gyro_noise_variance_dps2[axis] = 0.0f;
-        g_imu_gyro_calibration.gyro_noise_stddev_dps[axis] = 0.0f;
-    }
-
-    /* The receive task initializes the sensor.  Wait here so calibration never
-     * treats the zero-initialized IMU data as a valid stationary sample. */
-    while (g_imu_receive_data.imu_ready == 0U)
-    {
-        vTaskDelayUntil(&last_wake_tick, pdMS_TO_TICKS(RECEIVE_TASK_PERIOD_MS));
-    }
-
+    app_calibration_gyro_start();
+    calibration_wait_for_imu(&last_wake_tick);
+    (void)receive_imu_snapshot(&sample);
+    last_sample_count = sample.sample_count;
     start_tick = xTaskGetTickCount();
-    last_source_sample_count = g_imu_receive_data.sample_count;
+
     while ((xTaskGetTickCount() - start_tick) < bias_ticks)
     {
-        source_sample_count = g_imu_receive_data.sample_count;
-        if (source_sample_count != last_source_sample_count)
+        if ((receive_imu_snapshot(&sample) != 0U) &&
+            (sample.sample_count != last_sample_count))
         {
-            float sample[3];
-
-            sample[0] = g_imu_receive_data.gyro_x_dps;
-            sample[1] = g_imu_receive_data.gyro_y_dps;
-            sample[2] = g_imu_receive_data.gyro_z_dps;
-            last_source_sample_count = source_sample_count;
-
-            if (bias_sample_count < 0xFFFFFFFFU)
-            {
-                bias_sample_count++;
-                for (axis = 0U; axis < 3U; axis++)
-                {
-                    float delta = sample[axis] - bias_mean[axis];
-                    bias_mean[axis] += delta / (float)bias_sample_count;
-                }
-            }
+            last_sample_count = sample.sample_count;
+            app_calibration_gyro_bias_sample(&sample);
         }
-
         vTaskDelayUntil(&last_wake_tick, pdMS_TO_TICKS(RECEIVE_TASK_PERIOD_MS));
     }
 
-    for (axis = 0U; axis < 3U; axis++)
-    {
-        g_imu_gyro_calibration.gyro_bias_dps[axis] = bias_mean[axis];
-    }
-
-    /* Use the measured bias to correct a second, independent noise window. */
     start_tick = xTaskGetTickCount();
-    last_source_sample_count = g_imu_receive_data.sample_count;
-    while ((xTaskGetTickCount() - start_tick) < noise_ticks)
+    (void)receive_imu_snapshot(&sample);
+    last_sample_count = sample.sample_count;
+    while ((xTaskGetTickCount() - start_tick) < (total_ticks - bias_ticks))
     {
-        source_sample_count = g_imu_receive_data.sample_count;
-        if (source_sample_count != last_source_sample_count)
+        if ((receive_imu_snapshot(&sample) != 0U) &&
+            (sample.sample_count != last_sample_count))
         {
-            float sample[3];
-
-            sample[0] = g_imu_receive_data.gyro_x_dps;
-            sample[1] = g_imu_receive_data.gyro_y_dps;
-            sample[2] = g_imu_receive_data.gyro_z_dps;
-            last_source_sample_count = source_sample_count;
-
-            if (noise_sample_count < 0xFFFFFFFFU)
-            {
-                noise_sample_count++;
-                for (axis = 0U; axis < 3U; axis++)
-                {
-                    float bias_corrected_sample =
-                        sample[axis] - g_imu_gyro_calibration.gyro_bias_dps[axis];
-                    float delta = bias_corrected_sample - noise_mean[axis];
-
-                    noise_mean[axis] += delta / (float)noise_sample_count;
-                    noise_m2[axis] +=
-                        delta * (bias_corrected_sample - noise_mean[axis]);
-                }
-            }
+            last_sample_count = sample.sample_count;
+            app_calibration_gyro_noise_sample(&sample);
         }
-
         vTaskDelayUntil(&last_wake_tick, pdMS_TO_TICKS(RECEIVE_TASK_PERIOD_MS));
     }
-
-    g_imu_gyro_calibration.bias_sample_count = bias_sample_count;
-    g_imu_gyro_calibration.noise_sample_count = noise_sample_count;
-    g_imu_gyro_calibration.sample_count = bias_sample_count + noise_sample_count;
-    for (axis = 0U; axis < 3U; axis++)
-    {
-        if (noise_sample_count > 1U)
-        {
-            g_imu_gyro_calibration.gyro_noise_variance_dps2[axis] =
-                noise_m2[axis] / (float)(noise_sample_count - 1U);
-            g_imu_gyro_calibration.gyro_noise_stddev_dps[axis] =
-                sqrtf(g_imu_gyro_calibration.gyro_noise_variance_dps2[axis]);
-        }
-    }
-    g_imu_gyro_calibration.active = 0U;
-    g_imu_gyro_calibration.complete =
-        (bias_sample_count > 1U && noise_sample_count > 1U) ? 1U : 0U;
+    app_calibration_gyro_complete();
 }
 
 void receive_task(void *pvParameters)
 {
     TickType_t last_wake_tick = xTaskGetTickCount();
+    app_imu_sample_t imu;
+    app_encoder_sample_t encoder;
 
     (void)pvParameters;
-
     for (;;)
     {
         uint32_t metric_start = task_metrics_begin();
-
-        if (g_imu_receive_data.imu_ready != 0U)
+        if ((imu_sample_queue != NULL) && (app_sensor_read_imu(&imu) != 0U))
         {
-            imu660rc_get_acc();
-            imu660rc_get_gyro();
-
-            g_imu_receive_data.acc_x = imu660rc_acc_x;
-            g_imu_receive_data.acc_y = imu660rc_acc_y;
-            g_imu_receive_data.acc_z = imu660rc_acc_z;
-            g_imu_receive_data.gyro_x = imu660rc_gyro_x;
-            g_imu_receive_data.gyro_y = imu660rc_gyro_y;
-            g_imu_receive_data.gyro_z = imu660rc_gyro_z;
-            g_imu_receive_data.acc_x_g = imu660rc_acc_transition(imu660rc_acc_x);
-            g_imu_receive_data.acc_y_g = imu660rc_acc_transition(imu660rc_acc_y);
-            g_imu_receive_data.acc_z_g = imu660rc_acc_transition(imu660rc_acc_z);
-            g_imu_receive_data.gyro_x_dps = imu660rc_gyro_transition(imu660rc_gyro_x);
-            g_imu_receive_data.gyro_y_dps = imu660rc_gyro_transition(imu660rc_gyro_y);
-            g_imu_receive_data.gyro_z_dps = imu660rc_gyro_transition(imu660rc_gyro_z);
-            g_imu_receive_data.sample_count++;
-
+            imu.capture_tick = (uint32_t)xTaskGetTickCount();
+            (void)xQueueOverwrite(imu_sample_queue, &imu);
             if (g_imu_data_ready_sem != NULL)
             {
                 (void)xSemaphoreGive(g_imu_data_ready_sem);
             }
         }
-
-        g_encoder_receive_data.left_count = encoder_get_count(ENCODER_LEFT_INDEX);
-        g_encoder_receive_data.right_count = encoder_get_count(ENCODER_RIGHT_INDEX);
-
+        if (encoder_queue != NULL)
+        {
+            app_sensor_read_encoder(&encoder);
+            (void)xQueueOverwrite(encoder_queue, &encoder);
+        }
         task_metrics_end(TASK_METRIC_RECEIVE, metric_start);
         vTaskDelayUntil(&last_wake_tick, pdMS_TO_TICKS(RECEIVE_TASK_PERIOD_MS));
     }

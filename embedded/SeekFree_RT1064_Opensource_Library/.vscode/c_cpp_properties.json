@@ -4,6 +4,7 @@
       "name": "RT1064 Keil",
       "includePath": [
         "${workspaceFolder}/project/user/inc",
+        "${workspaceFolder}/project/code",
         "${workspaceFolder}/libraries/Freertos",
         "${workspaceFolder}/libraries/Freertos/include",
         "${workspaceFolder}/libraries/Freertos/portable/GCC/ARM_CM7/r0p1",
@@ -46,8 +47,17 @@
         "${workspaceFolder}/libraries/myAlgorithm/lqr",
         "${workspaceFolder}/libraries/myAlgorithm/pid",
         "${workspaceFolder}/libraries/myAlgorithm/madgwick",
-        "${workspaceFolder}/libraries/myAlgorithm/math"
+        "${workspaceFolder}/libraries/myAlgorithm/math",
+        "${workspaceFolder}/libraries/myAlgorithm/statistics",
+        "${workspaceFolder}/libraries/myApplication/system",
+        "${workspaceFolder}/libraries/myApplication/sensor",
+        "${workspaceFolder}/libraries/myApplication/motion",
+        "${workspaceFolder}/libraries/myApplication/interaction",
+        "${workspaceFolder}/libraries/myApplication/state",
+        "${workspaceFolder}/libraries/myApplication/communication",
+        "${workspaceFolder}/libraries/myDriver"
       ],
+      "compileCommands": "${workspaceFolder}/../../compile_commands.json",
       "defines": [
         "CPU_MIMXRT1064DVL6A",
         "SKIP_SYSCLK_INIT",

@@ -5,14 +5,6 @@
 #include "math.h"
 #include <stdlib.h>
 #include "arm_math.h"
-#include "FreeRTOS.h"
-#include "task.h"
-
-#ifdef portSTACK_GROWTH  // FreeRTOS 存在时使用 pvPortMalloc
-#define user_malloc pvPortMalloc
-#else
-#define user_malloc malloc
-#endif
 
 #define mat arm_matrix_instance_f32
 #define Mat_Init arm_mat_init_f32

@@ -1,17 +1,9 @@
 #ifndef KALMAN_H
 #define KALMAN_H
 
+#include <stddef.h>
 #include "math.h"
-#include <stdlib.h>
 #include "arm_math.h"
-#include "FreeRTOS.h"
-#include "task.h"
-
-#ifdef portSTACK_GROWTH  // FreeRTOS 存在时使用 pvPortMalloc
-#define user_malloc pvPortMalloc
-#else
-#define user_malloc malloc
-#endif
 
 #define mat arm_matrix_instance_f32
 #define Mat_Init arm_mat_init_f32
@@ -22,6 +14,8 @@
 #define Mat_Inv arm_mat_inverse_f32
 
 extern uint16_t sizeof_float, sizeof_double;
+
+void Kalman_Filter_SetAllocator(void *(*allocate)(size_t));
 
 typedef struct kf_t{
     float *FilteredValue;
