@@ -52,6 +52,8 @@ static void enter_protection(app_state_t *state)
     state->vehicle_mode = APP_VEHICLE_PROTECT;
     state->target_speed_m_s = 0.0f;
     state->target_yaw_deg = 0.0f;
+    state->balance_entry_kick_age_ms = 0U;
+    state->balance_entry_kick_active = 0U;
 }
 
 void app_state_force_protection(app_state_t *state)
@@ -96,6 +98,8 @@ void app_state_step(app_state_t *state, const app_state_buttons_t *buttons,
     uint8_t protect_pressed;
     uint8_t fallen;
     uint8_t can_arm;
+    uint8_t support_can_arm;
+    uint8_t support_pitch_in_range;
     uint8_t link_lost = 0U;
 
     if ((state == NULL) || (buttons == NULL))
@@ -104,12 +108,15 @@ void app_state_step(app_state_t *state, const app_state_buttons_t *buttons,
     }
     state->calibrate_requested = 0U;
     state->reset_ekf_requested = 0U;
+    state->pid_update_requested = 0U;
     if ((command != NULL) &&
         (command->type != SERIAL_COMMAND_HEARTBEAT) &&
         (command->type != SERIAL_COMMAND_STATE) &&
         (command->type != SERIAL_COMMAND_SPEED) &&
         (command->type != SERIAL_COMMAND_YAW) &&
-        (command->type != SERIAL_COMMAND_MOTION))
+        (command->type != SERIAL_COMMAND_MOTION) &&
+        ((command->type < SERIAL_COMMAND_PID_BASE) ||
+         (command->type > SERIAL_COMMAND_PID_LAST)))
     {
         command = NULL;
     }
@@ -121,6 +128,7 @@ void app_state_step(app_state_t *state, const app_state_buttons_t *buttons,
 
     if (buttons->switches_on != 0U)
     {
+        state->support_pitch_age_ms = 0U;
         state->control_mode = APP_STATE_CALIBRATION;
         enter_protection(state);
         state->target_yaw_deg = 0.0f;
@@ -135,8 +143,60 @@ void app_state_step(app_state_t *state, const app_state_buttons_t *buttons,
     }
     if (buttons->switches_off == 0U)
     {
+        state->support_pitch_age_ms = 0U;
+        state->support_exit_age_ms = 0U;
         enter_protection(state);
         return;
+    }
+
+    support_pitch_in_range = ((state->vehicle_mode == APP_VEHICLE_BALANCE) &&
+                              (attitude_valid != 0U) &&
+                              isfinite(pitch_deg) &&
+                              (pitch_deg >= VEHICLE_SUPPORT_AUTO_MIN_PITCH_DEG) &&
+                              (pitch_deg <= VEHICLE_SUPPORT_AUTO_MAX_PITCH_DEG)) ?
+                             1U : 0U;
+    if (support_pitch_in_range != 0U)
+    {
+        state->support_pitch_age_ms = saturating_add(
+            state->support_pitch_age_ms, dt_ms);
+    }
+    else
+    {
+        state->support_pitch_age_ms = 0U;
+    }
+
+    if ((state->vehicle_mode == APP_VEHICLE_SUPPORT) &&
+        (attitude_valid != 0U) && isfinite(pitch_deg) &&
+        (pitch_deg >= VEHICLE_SUPPORT_EXIT_PITCH_DEG))
+    {
+        state->support_exit_age_ms = saturating_add(
+            state->support_exit_age_ms, dt_ms);
+    }
+    else
+    {
+        state->support_exit_age_ms = 0U;
+    }
+
+    /* A kick belongs to the support-to-balance transition. Support mode
+     * itself remains stationary until the exit pitch condition is met. */
+    if (state->balance_entry_kick_active != 0U)
+    {
+        state->balance_entry_kick_age_ms = saturating_add(
+            state->balance_entry_kick_age_ms, dt_ms);
+        if (state->balance_entry_kick_age_ms <
+            VEHICLE_BALANCE_ENTRY_KICK_MS)
+        {
+            state->target_speed_m_s = VEHICLE_BALANCE_ENTRY_KICK_SPEED_MPS;
+        }
+        else
+        {
+            state->target_speed_m_s = 0.0f;
+            state->balance_entry_kick_active = 0U;
+        }
+    }
+    else if (state->vehicle_mode == APP_VEHICLE_SUPPORT)
+    {
+        state->target_speed_m_s = 0.0f;
     }
 
     fallen = ((attitude_valid == 0U) || !isfinite(pitch_deg) ||
@@ -145,6 +205,9 @@ void app_state_step(app_state_t *state, const app_state_buttons_t *buttons,
     can_arm = ((fallen == 0U) &&
                (fabsf(pitch_deg - BALANCE_UPRIGHT_PITCH_DEG) <=
                 VEHICLE_ARM_PITCH_MAX_DEG)) ? 1U : 0U;
+    support_can_arm = ((fallen == 0U) &&
+                       (fabsf(pitch_deg - BALANCE_SUPPORT_TARGET_PITCH_DEG) <=
+                        VEHICLE_SUPPORT_ARM_PITCH_MAX_DEG)) ? 1U : 0U;
 
     if (command != NULL)
     {
@@ -162,10 +225,51 @@ void app_state_step(app_state_t *state, const app_state_buttons_t *buttons,
         }
     }
 
+    if ((command != NULL) &&
+        (command->type >= SERIAL_COMMAND_PID_BASE) &&
+        (command->type <= SERIAL_COMMAND_PID_LAST))
+    {
+        state->pid_update_requested = 1U;
+        state->pid_controller = command->pid_controller;
+        state->pid_parameter = command->pid_parameter;
+        state->pid_value = command->pid_value;
+        enter_protection(state);
+        return;
+    }
+
     if ((fallen != 0U) || (protect_pressed != 0U) ||
         (state->button_stable[2] != 0U) || (link_lost != 0U))
     {
+        if ((protect_pressed != 0U) || (state->button_stable[2] != 0U))
+        {
+            state->support_pitch_age_ms = 0U;
+        }
         enter_protection(state);
+        return;
+    }
+
+    if ((state->vehicle_mode == APP_VEHICLE_SUPPORT) &&
+        (state->support_exit_age_ms >= VEHICLE_SUPPORT_EXIT_MS) &&
+        !((command != NULL) && (command->type == SERIAL_COMMAND_STATE) &&
+          (command->value == SERIAL_STATE_PROTECT)))
+    {
+        state->vehicle_mode = APP_VEHICLE_BALANCE;
+        state->target_speed_m_s = VEHICLE_BALANCE_ENTRY_KICK_SPEED_MPS;
+        state->target_yaw_deg = 0.0f;
+        state->support_exit_age_ms = 0U;
+        state->balance_entry_kick_age_ms = 0U;
+        state->balance_entry_kick_active = 1U;
+        return;
+    }
+
+    if ((state->support_pitch_age_ms >= VEHICLE_SUPPORT_AUTO_ENTER_MS) &&
+        (state->vehicle_mode == APP_VEHICLE_BALANCE) &&
+        !((command != NULL) && (command->type == SERIAL_COMMAND_STATE) &&
+          (command->value == SERIAL_STATE_PROTECT)))
+    {
+        state->vehicle_mode = APP_VEHICLE_SUPPORT;
+        state->target_speed_m_s = 0.0f;
+        state->target_yaw_deg = 0.0f;
         return;
     }
 
@@ -201,9 +305,16 @@ void app_state_step(app_state_t *state, const app_state_buttons_t *buttons,
                 APP_VEHICLE_BALANCE : APP_VEHICLE_NAVIGATION;
             state->target_speed_m_s = 0.0f;
         }
+        else if ((support_can_arm != 0U) &&
+                 (command->value == SERIAL_STATE_SUPPORT))
+        {
+            state->vehicle_mode = APP_VEHICLE_SUPPORT;
+            state->target_speed_m_s = 0.0f;
+        }
     }
     else if ((command->type == SERIAL_COMMAND_SPEED) &&
-             (state->vehicle_mode == APP_VEHICLE_BALANCE))
+             ((state->vehicle_mode == APP_VEHICLE_BALANCE) ||
+              (state->vehicle_mode == APP_VEHICLE_SUPPORT)))
     {
         state->target_speed_m_s = clamp(
             (float)command->value * SERIAL_SPEED_SCALE_MPS,
@@ -211,7 +322,8 @@ void app_state_step(app_state_t *state, const app_state_buttons_t *buttons,
     }
     else if (((command->type == SERIAL_COMMAND_YAW) ||
               (command->type == SERIAL_COMMAND_MOTION)) &&
-             (state->vehicle_mode == APP_VEHICLE_BALANCE))
+             ((state->vehicle_mode == APP_VEHICLE_BALANCE) ||
+              (state->vehicle_mode == APP_VEHICLE_SUPPORT)))
     {
         state->target_yaw_deg = (float)((command->type == SERIAL_COMMAND_MOTION) ?
             command->value2 : command->value) * SERIAL_YAW_SCALE_DEG;
@@ -228,5 +340,6 @@ uint8_t app_state_balance_enabled(const app_state_t *state)
 {
     return ((state != NULL) &&
             ((state->vehicle_mode == APP_VEHICLE_BALANCE) ||
-             (state->vehicle_mode == APP_VEHICLE_NAVIGATION))) ? 1U : 0U;
+             (state->vehicle_mode == APP_VEHICLE_NAVIGATION) ||
+             (state->vehicle_mode == APP_VEHICLE_SUPPORT))) ? 1U : 0U;
 }

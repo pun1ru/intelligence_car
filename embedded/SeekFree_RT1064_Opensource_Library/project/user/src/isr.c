@@ -36,6 +36,7 @@
 #include "zf_common_headfile.h"
 #include "zf_common_debug.h"
 #include "isr.h"
+#include "drv_io.h"
 
 
 
@@ -147,7 +148,7 @@ void LPUART8_IRQHandler(void)
     if(kLPUART_RxDataRegFullFlag & LPUART_GetStatusFlags(LPUART8))
     {
         // �����ж�
-        wireless_module_uart_handler();
+        drv_io_uart_rx_isr();
         
     }
         

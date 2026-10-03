@@ -7,6 +7,21 @@
 
 static int16_t last_left_count;
 static int16_t last_right_count;
+static int16_t actual_left_pwm;
+static int16_t actual_right_pwm;
+
+static int16_t limited_pwm(int32_t pwm)
+{
+    if (pwm > SERIAL_PWM_LIMIT)
+    {
+        return SERIAL_PWM_LIMIT;
+    }
+    if (pwm < -SERIAL_PWM_LIMIT)
+    {
+        return -SERIAL_PWM_LIMIT;
+    }
+    return (int16_t)pwm;
+}
 
 static int16_t encoder_delta(int16_t current, int16_t previous)
 {
@@ -61,14 +76,30 @@ void drv_motion_init(uint32_t key_period_ms)
     encoder_clear_count(ENCODER_RIGHT_INDEX);
     last_left_count = 0;
     last_right_count = 0;
+    actual_left_pwm = 0;
+    actual_right_pwm = 0;
 }
 
 void drv_motion_set_signed(int32_t left_pwm, int32_t right_pwm)
 {
-    set_motor(left_pwm, MOTOR_LEFT_PWM_CHANNEL, MOTOR_LEFT_DIRECTION_PIN,
+    actual_left_pwm = limited_pwm(left_pwm);
+    actual_right_pwm = limited_pwm(right_pwm);
+    set_motor(actual_left_pwm, MOTOR_LEFT_PWM_CHANNEL, MOTOR_LEFT_DIRECTION_PIN,
               WHEEL_LEFT_PWM_FORWARD_LEVEL);
-    set_motor(right_pwm, MOTOR_RIGHT_PWM_CHANNEL, MOTOR_RIGHT_DIRECTION_PIN,
+    set_motor(actual_right_pwm, MOTOR_RIGHT_PWM_CHANNEL, MOTOR_RIGHT_DIRECTION_PIN,
               WHEEL_RIGHT_PWM_FORWARD_LEVEL);
+}
+
+void drv_motion_get_signed(int16_t *left_pwm, int16_t *right_pwm)
+{
+    if (left_pwm != NULL)
+    {
+        *left_pwm = actual_left_pwm;
+    }
+    if (right_pwm != NULL)
+    {
+        *right_pwm = actual_right_pwm;
+    }
 }
 
 void drv_motion_read_encoder(int16_t *left_count, int16_t *right_count)

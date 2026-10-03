@@ -5,6 +5,71 @@
 #include "drv_motion.h"
 #include "general_define.h"
 
+static uint8_t update_gain(control_pid_t *pid, uint8_t parameter, float value)
+{
+    if ((pid == NULL) || !isfinite(value) || (value < 0.0f) ||
+        (value > SERIAL_PID_MAX_VALUE))
+    {
+        return 0U;
+    }
+    if (parameter == SERIAL_PID_GAIN_KP)
+    {
+        pid->kp = value;
+    }
+    else if (parameter == SERIAL_PID_GAIN_KI)
+    {
+        pid->ki = value;
+    }
+    else if (parameter == SERIAL_PID_GAIN_KD)
+    {
+        pid->kd = value;
+    }
+    else
+    {
+        return 0U;
+    }
+    control_pid_reset(pid);
+    return 1U;
+}
+
+uint8_t app_balance_update_pid(app_balance_t *control, uint8_t controller,
+                               uint8_t parameter, float value)
+{
+    if (control == NULL)
+    {
+        return 0U;
+    }
+    if (controller == SERIAL_PID_CONTROLLER_WHEEL)
+    {
+        return (uint8_t)(update_gain(&control->wheel_left, parameter, value) &&
+                         update_gain(&control->wheel_right, parameter, value));
+    }
+    if (controller == SERIAL_PID_CONTROLLER_ANGLE)
+    {
+        return update_gain(&control->angle, parameter, value);
+    }
+    if (controller == SERIAL_PID_CONTROLLER_SPEED)
+    {
+        return update_gain(&control->speed, parameter, value);
+    }
+    return 0U;
+}
+
+void app_balance_set_pitch_target(app_balance_t *control, float target_pitch_deg)
+{
+    if ((control != NULL) && isfinite(target_pitch_deg))
+    {
+        /* Keep the speed-loop output between its slower update periods. */
+        if (control->base_pitch_deg != target_pitch_deg)
+        {
+            control->base_pitch_deg = target_pitch_deg;
+            control->target_tilt_deg = target_pitch_deg;
+            control->speed_elapsed_ms = 0U;
+            control_pid_reset(&control->speed);
+        }
+    }
+}
+
 #if (BALANCE_SPEED_PERIOD_MS < BALANCE_ANGLE_PERIOD_MS) || \
     ((BALANCE_SPEED_PERIOD_MS % BALANCE_ANGLE_PERIOD_MS) != 0U)
 #error Balance speed loop period must be a multiple of the angle loop period.
@@ -42,7 +107,16 @@ void app_balance_init(app_balance_t *control)
                      BALANCE_ANGLE_KD, BALANCE_ANGLE_PWM_LIMIT);
     control_pid_init(&control->speed, BALANCE_SPEED_KP, BALANCE_SPEED_KI,
                      BALANCE_SPEED_KD, BALANCE_TARGET_TILT_MAX_DEG);
-    control->target_tilt_deg = BALANCE_ANGLE_TARGET_PITCH_DEG;
+    control_pid_set_derivative_filter(&control->wheel_left,
+                                      CONTROL_PID_D_FILTER_ALPHA);
+    control_pid_set_derivative_filter(&control->wheel_right,
+                                      CONTROL_PID_D_FILTER_ALPHA);
+    control_pid_set_derivative_filter(&control->angle,
+                                      CONTROL_PID_D_FILTER_ALPHA);
+    control_pid_set_derivative_filter(&control->speed,
+                                      CONTROL_PID_D_FILTER_ALPHA);
+    control->base_pitch_deg = BALANCE_ANGLE_TARGET_PITCH_DEG;
+    control->target_tilt_deg = control->base_pitch_deg;
     control->speed_elapsed_ms = 0U;
 }
 
@@ -56,7 +130,7 @@ void app_balance_reset(app_balance_t *control)
     control_pid_reset(&control->wheel_right);
     control_pid_reset(&control->angle);
     control_pid_reset(&control->speed);
-    control->target_tilt_deg = BALANCE_ANGLE_TARGET_PITCH_DEG;
+    control->target_tilt_deg = control->base_pitch_deg;
     control->speed_elapsed_ms = 0U;
 }
 
@@ -128,7 +202,7 @@ void app_balance_step(app_balance_t *control, uint8_t enabled,
     }
     output->left_pwm = 0;
     output->right_pwm = 0;
-    output->target_tilt_deg = BALANCE_ANGLE_TARGET_PITCH_DEG;
+    output->target_tilt_deg = control->base_pitch_deg;
 
     if ((enabled == 0U) || !isfinite(target_speed_m_s) ||
         !isfinite(pitch_deg) || !isfinite(pitch_rate_dps) ||
@@ -144,7 +218,7 @@ void app_balance_step(app_balance_t *control, uint8_t enabled,
     if (control->speed_elapsed_ms >= BALANCE_SPEED_PERIOD_MS)
     {
         average_speed = (left_speed_m_s + right_speed_m_s) * 0.5f;
-        control->target_tilt_deg = BALANCE_ANGLE_TARGET_PITCH_DEG +
+        control->target_tilt_deg = control->base_pitch_deg +
             BALANCE_SPEED_TO_TILT_SIGN * control_pid_step(&control->speed,
                 clamp(target_speed_m_s, BALANCE_SPEED_TARGET_MAX_MPS),
                 average_speed, 0.0f,

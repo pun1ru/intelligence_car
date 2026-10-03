@@ -28,6 +28,25 @@ void control_pid_init(control_pid_t *pid, float kp, float ki, float kd,
     pid->kd = kd;
     pid->output_limit = output_limit;
     pid->integral = 0.0f;
+    pid->derivative_filtered = 0.0f;
+    pid->derivative_filter_alpha = 1.0f;
+}
+
+void control_pid_set_derivative_filter(control_pid_t *pid, float alpha)
+{
+    if ((pid == NULL) || !isfinite(alpha))
+    {
+        return;
+    }
+    if (alpha < 0.0f)
+    {
+        alpha = 0.0f;
+    }
+    else if (alpha > 1.0f)
+    {
+        alpha = 1.0f;
+    }
+    pid->derivative_filter_alpha = alpha;
 }
 
 void control_pid_reset(control_pid_t *pid)
@@ -35,6 +54,7 @@ void control_pid_reset(control_pid_t *pid)
     if (pid != NULL)
     {
         pid->integral = 0.0f;
+        pid->derivative_filtered = 0.0f;
     }
 }
 
@@ -42,6 +62,7 @@ float control_pid_step(control_pid_t *pid, float setpoint, float measurement,
                        float measurement_rate, float dt_s)
 {
     float error;
+    float derivative;
     float candidate_integral;
     float candidate_output;
 
@@ -53,6 +74,10 @@ float control_pid_step(control_pid_t *pid, float setpoint, float measurement,
     }
 
     error = setpoint - measurement;
+    derivative = pid->derivative_filtered +
+                 pid->derivative_filter_alpha *
+                 (measurement_rate - pid->derivative_filtered);
+    pid->derivative_filtered = derivative;
     candidate_integral = (pid->ki == 0.0f) ? pid->integral :
                          pid->integral + error * dt_s;
     if (pid->ki != 0.0f)
@@ -61,12 +86,12 @@ float control_pid_step(control_pid_t *pid, float setpoint, float measurement,
                                    pid->output_limit / fabsf(pid->ki));
     }
     candidate_output = pid->kp * error + pid->ki * candidate_integral -
-                       pid->kd * measurement_rate;
+                       pid->kd * derivative;
     if ((candidate_output <= pid->output_limit || error < 0.0f) &&
         (candidate_output >= -pid->output_limit || error > 0.0f))
     {
         pid->integral = candidate_integral;
     }
     return clamp(pid->kp * error + pid->ki * pid->integral -
-                 pid->kd * measurement_rate, pid->output_limit);
+                 pid->kd * derivative, pid->output_limit);
 }

@@ -15,7 +15,8 @@ typedef enum
 {
     APP_VEHICLE_PROTECT,
     APP_VEHICLE_BALANCE,
-    APP_VEHICLE_NAVIGATION
+    APP_VEHICLE_NAVIGATION,
+    APP_VEHICLE_SUPPORT
 } app_vehicle_mode_t;
 
 typedef struct
@@ -40,6 +41,14 @@ typedef struct
     uint8_t button_stable[4];
     uint8_t calibrate_requested;
     uint8_t reset_ekf_requested;
+    uint8_t pid_update_requested;
+    uint8_t pid_controller;
+    uint8_t pid_parameter;
+    float pid_value;
+    uint32_t support_pitch_age_ms;
+    uint32_t support_exit_age_ms;
+    uint32_t balance_entry_kick_age_ms;
+    uint8_t balance_entry_kick_active;
 } app_state_t;
 
 void app_state_init(app_state_t *state);

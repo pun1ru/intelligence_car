@@ -27,6 +27,39 @@ static float speed_right_sum_m_s;
 static float speed_left_m_s;
 static float speed_right_m_s;
 static uint32_t speed_sample_count;
+static app_control_telemetry_t control_telemetry;
+
+uint8_t app_control_apply_pid_update(uint8_t controller, uint8_t parameter,
+                                     float value)
+{
+    uint8_t updated;
+
+    if (wheel_test_initialized == 0U)
+    {
+        app_balance_init(&wheel_test_control);
+        app_balance_init(&angle_control);
+        wheel_test_initialized = 1U;
+    }
+    updated = app_balance_update_pid(&wheel_test_control, controller,
+                                     parameter, value);
+    if (app_balance_update_pid(&angle_control, controller, parameter, value) == 0U)
+    {
+        updated = 0U;
+    }
+    return updated;
+}
+
+void app_control_get_telemetry(app_control_telemetry_t *telemetry)
+{
+    if (telemetry != NULL)
+    {
+        *telemetry = control_telemetry;
+        telemetry->left_speed_m_s = speed_left_m_s;
+        telemetry->right_speed_m_s = speed_right_m_s;
+        telemetry->target_pitch_deg = angle_control.target_tilt_deg;
+        drv_motion_get_signed(&telemetry->left_pwm, &telemetry->right_pwm);
+    }
+}
 
 static void reset_speed_feedback(void)
 {
@@ -35,6 +68,7 @@ static void reset_speed_feedback(void)
     speed_left_m_s = 0.0f;
     speed_right_m_s = 0.0f;
     speed_sample_count = 0U;
+    control_telemetry.wheel_valid = 0U;
 }
 
 static uint16_t test_duty(int32_t pwm)
@@ -73,12 +107,15 @@ uint8_t app_control_step(const app_state_t *state,
     if (wheel_elapsed_ms >= WHEEL_SPEED_LOOP_PERIOD_MS)
     {
         drv_motion_read_encoder_delta(&counts.left_count, &counts.right_count);
+        control_telemetry.left_delta_count = counts.left_count;
+        control_telemetry.right_delta_count = counts.right_count;
         wheel_elapsed_ms = 0U;
         sample_ready = 1U;
         sample_valid = app_encoder_convert(&counts,
             (float)WHEEL_SPEED_LOOP_PERIOD_MS / 1000.0f, &motion);
         if (sample_valid != 0U)
         {
+            control_telemetry.wheel_valid = 1U;
             speed_left_sum_m_s += motion.left.speed_m_s;
             speed_right_sum_m_s += motion.right.speed_m_s;
             speed_sample_count++;
@@ -171,6 +208,10 @@ uint8_t app_control_step(const app_state_t *state,
         drv_motion_set_signed(0, 0);
         return 1U;
     }
+
+    app_balance_set_pitch_target(&angle_control,
+        (state->vehicle_mode == APP_VEHICLE_SUPPORT) ?
+        BALANCE_SUPPORT_TARGET_PITCH_DEG : BALANCE_ANGLE_TARGET_PITCH_DEG);
 
     app_balance_step(&angle_control, 1U, state->target_speed_m_s,
                      attitude->pitch, attitude->pitch_rate_dps,

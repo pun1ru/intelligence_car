@@ -16,6 +16,7 @@ void drv_io_platform_init(void);
 void drv_io_uart_init(void);
 void drv_io_uart_write(const uint8_t *data, size_t length);
 uint8_t drv_io_uart_try_read(uint8_t *byte);
+void drv_io_uart_rx_isr(void);
 void drv_io_display_init(void);
 void drv_io_display_angles(float roll, float pitch, float yaw,
                            float pitch_rate_dps);

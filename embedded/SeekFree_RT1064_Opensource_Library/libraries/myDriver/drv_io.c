@@ -3,6 +3,15 @@
 #include "general_define.h"
 #include "zf_common_headfile.h"
 
+#if (VEHICLE_UART_RX_BUFFER_SIZE < 16U) || \
+    ((VEHICLE_UART_RX_BUFFER_SIZE & (VEHICLE_UART_RX_BUFFER_SIZE - 1U)) != 0U)
+#error UART RX buffer size must be a power of two and at least 16 bytes.
+#endif
+
+static uint8_t uart_rx_buffer[VEHICLE_UART_RX_BUFFER_SIZE];
+static volatile uint16_t uart_rx_head;
+static volatile uint16_t uart_rx_tail;
+
 uint8_t drv_io_button_pressed(drv_io_button_t button)
 {
     gpio_pin_enum pin;
@@ -41,13 +50,41 @@ void drv_io_platform_init(void)
 
 void drv_io_uart_init(void)
 {
+    uart_rx_head = 0U;
+    uart_rx_tail = 0U;
     uart_init(VEHICLE_UART_INDEX, VEHICLE_UART_BAUD,
               VEHICLE_UART_TX_PIN, VEHICLE_UART_RX_PIN);
+    uart_rx_interrupt(VEHICLE_UART_INDEX, 1U);
 }
 
 uint8_t drv_io_uart_try_read(uint8_t *byte)
 {
-    return (byte != NULL) ? uart_query_byte(VEHICLE_UART_INDEX, byte) : 0U;
+    uint16_t tail;
+
+    if ((byte == NULL) || (uart_rx_tail == uart_rx_head))
+    {
+        return 0U;
+    }
+    tail = uart_rx_tail;
+    *byte = uart_rx_buffer[tail];
+    uart_rx_tail = (tail + 1U) & (VEHICLE_UART_RX_BUFFER_SIZE - 1U);
+    return 1U;
+}
+
+void drv_io_uart_rx_isr(void)
+{
+    uint8_t byte;
+    uint16_t next;
+
+    while (uart_query_byte(VEHICLE_UART_INDEX, &byte) != 0U)
+    {
+        next = (uart_rx_head + 1U) & (VEHICLE_UART_RX_BUFFER_SIZE - 1U);
+        if (next != uart_rx_tail)
+        {
+            uart_rx_buffer[uart_rx_head] = byte;
+            uart_rx_head = next;
+        }
+    }
 }
 
 void drv_io_uart_write(const uint8_t *data, size_t length)

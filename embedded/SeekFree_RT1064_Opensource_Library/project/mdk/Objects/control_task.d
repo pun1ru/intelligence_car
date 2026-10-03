@@ -1,7 +1,7 @@
 ./objects/control_task.o: ..\user\src\control_task.c \
   ..\user\inc\control_task.h \
-  ..\..\libraries\myApplication\motion\app_control.h \
   C:\Keil_v5\ARM\ARMCLANG\Bin\..\include\stdint.h \
+  ..\..\libraries\myApplication\motion\app_control.h \
   ..\..\libraries\myApplication\sensor\app_attitude.h \
   C:\Keil_v5\ARM\ARMCLANG\Bin\..\include\stddef.h \
   ..\..\libraries\myApplication\sensor\app_sensor.h \

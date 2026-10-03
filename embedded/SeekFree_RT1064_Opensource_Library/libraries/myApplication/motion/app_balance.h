@@ -10,6 +10,7 @@ typedef struct
     control_pid_t wheel_right;
     control_pid_t angle;
     control_pid_t speed;
+    float base_pitch_deg;
     float target_tilt_deg;
     uint32_t speed_elapsed_ms;
 } app_balance_t;
@@ -20,6 +21,10 @@ typedef struct
     int32_t right_pwm;
     float target_tilt_deg;
 } app_balance_output_t;
+
+uint8_t app_balance_update_pid(app_balance_t *control, uint8_t controller,
+                               uint8_t parameter, float value);
+void app_balance_set_pitch_target(app_balance_t *control, float target_pitch_deg);
 
 void app_balance_init(app_balance_t *control);
 void app_balance_reset(app_balance_t *control);
