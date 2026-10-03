@@ -28,3 +28,15 @@
 C26/C27 双开时进入校准模式；C12 采样校准，C13 重置当前姿态滤波器。轮速测试由控制任务每 10 ms 调用 `app_control_step`：按住 C15 测左轮、按住 C14 测右轮，有符号正 PWM 经 `WHEEL_*_PWM_FORWARD_LEVEL=0` 将对应 DIR 设为低电平。控制器根据独立读取的增量编码器计数和轮系尺寸，按轮速绝对值闭环跟踪 `MOTOR_TEST_TARGET_SPEED_MPS=1.0 m/s`；PWM 上限为 `MOTOR_TEST_MAX_PWM_DUTY=5000/10000`。轮速 P 增益为 `4000`。松开对应按键或退出双开模式，该轮立即归零并重置 PID。C26/C27 只开一个时同样输出零 PWM。
 
 正常模式中 C14 申请平衡、C13 申请导航、C15 保护；串口可请求相同状态并保存速度、yaw 目标，500 ms 无合法帧后锁存保护。导航暂不执行路径动作。姿态算法依据实际 IMU 样本间隔积分；显示 roll 的符号已按 `+X` 观察方向修正。
+The steering defaults are `Kp=100`, `Ki=2`, `Kd=0`, with a separate angle
+feedforward default of `10 PWM/deg`. The steering feedforward is the shortest
+Yaw error multiplied by this gain. The control loop wraps
+the target minus measured Yaw into `[-180, 180]`, so crossing the angle
+boundary always follows the shorter turn. Encoder speed anomalies are exposed
+as a telemetry diagnostic (`valid bit5`) after 100 ms and clear after 200 ms;
+the flag does not independently enter protection.
+
+Support mode forces the steering loop off and clears its integral. When Support
+returns to Balance, the state task seeds the target Yaw from the current measured
+Yaw. The speed loop default Kp is `16`; its pitch target limit is asymmetric:
+`+15 deg` forward and `-5 deg` backward, while the angle PWM limit is `3500`.

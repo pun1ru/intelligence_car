@@ -72,6 +72,10 @@ void app_state_init(app_state_t *state)
         state->control_mode = APP_STATE_BUTTON_DEBUG;
         state->vehicle_mode = APP_VEHICLE_PROTECT;
         state->serial_idle_ms = VEHICLE_SERIAL_TIMEOUT_MS;
+        state->wheel_feedforward_gain = WHEEL_SPEED_FEEDFORWARD_PWM_PER_MPS;
+        state->steering_feedforward_gain =
+            BALANCE_STEERING_FEEDFORWARD_PWM_PER_DEG;
+        state->steering_enabled = BALANCE_STEERING_ENABLE_DEFAULT;
     }
 }
 
@@ -109,12 +113,17 @@ void app_state_step(app_state_t *state, const app_state_buttons_t *buttons,
     state->calibrate_requested = 0U;
     state->reset_ekf_requested = 0U;
     state->pid_update_requested = 0U;
+    state->gyro_bias_calibrate_requested = 0U;
     if ((command != NULL) &&
         (command->type != SERIAL_COMMAND_HEARTBEAT) &&
         (command->type != SERIAL_COMMAND_STATE) &&
         (command->type != SERIAL_COMMAND_SPEED) &&
         (command->type != SERIAL_COMMAND_YAW) &&
         (command->type != SERIAL_COMMAND_MOTION) &&
+        (command->type != SERIAL_COMMAND_FEEDFORWARD) &&
+        (command->type != SERIAL_COMMAND_CALIBRATE) &&
+        (command->type != SERIAL_COMMAND_STEERING) &&
+        (command->type != SERIAL_COMMAND_STEERING_FEEDFORWARD) &&
         ((command->type < SERIAL_COMMAND_PID_BASE) ||
          (command->type > SERIAL_COMMAND_PID_LAST)))
     {
@@ -237,6 +246,13 @@ void app_state_step(app_state_t *state, const app_state_buttons_t *buttons,
         return;
     }
 
+    if ((command != NULL) && (command->type == SERIAL_COMMAND_CALIBRATE))
+    {
+        state->gyro_bias_calibrate_requested = 1U;
+        enter_protection(state);
+        return;
+    }
+
     if ((fallen != 0U) || (protect_pressed != 0U) ||
         (state->button_stable[2] != 0U) || (link_lost != 0U))
     {
@@ -333,6 +349,28 @@ void app_state_step(app_state_t *state, const app_state_buttons_t *buttons,
                 (float)command->value * SERIAL_SPEED_SCALE_MPS,
                 BALANCE_SPEED_TARGET_MAX_MPS);
         }
+    }
+    else if ((command->type == SERIAL_COMMAND_FEEDFORWARD) &&
+             (command->value >= 0))
+    {
+        state->wheel_feedforward_gain = clamp(
+            (float)command->value * SERIAL_FEEDFORWARD_SCALE,
+            SERIAL_FEEDFORWARD_MAX_PWM_PER_MPS);
+        enter_protection(state);
+    }
+    else if ((command->type == SERIAL_COMMAND_STEERING) &&
+             ((command->value == 0) || (command->value == 1)))
+    {
+        state->steering_enabled = (uint8_t)command->value;
+        enter_protection(state);
+    }
+    else if ((command->type == SERIAL_COMMAND_STEERING_FEEDFORWARD) &&
+             (command->value >= 0))
+    {
+        state->steering_feedforward_gain = clamp(
+            (float)command->value * SERIAL_STEERING_FEEDFORWARD_SCALE,
+            SERIAL_STEERING_FEEDFORWARD_MAX_PWM_PER_DEG);
+        enter_protection(state);
     }
 }
 

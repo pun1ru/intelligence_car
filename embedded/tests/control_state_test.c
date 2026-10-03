@@ -360,11 +360,11 @@ static void test_balance(void)
     for (index = 0U; index < 3U; index++)
     {
         app_balance_step(&control, 1U, 0.5f, BALANCE_UPRIGHT_PITCH_DEG, 0.0f,
-                         0.0f, 0.0f, &output);
+                         0.0f, 0.0f, 0.0f, 0.0f, 0.0f, &output);
         assert(output.target_tilt_deg == BALANCE_ANGLE_TARGET_PITCH_DEG);
     }
     app_balance_step(&control, 1U, 0.5f, BALANCE_UPRIGHT_PITCH_DEG, 0.0f,
-                     0.0f, 0.0f, &output);
+                     0.0f, 0.0f, 0.0f, 0.0f, 0.0f, &output);
     assert(output.target_tilt_deg > BALANCE_ANGLE_TARGET_PITCH_DEG);
     app_balance_reset(&control);
 
@@ -372,15 +372,35 @@ static void test_balance(void)
     {
         app_balance_step(&control, 1U, 0.0f,
                          BALANCE_ANGLE_TARGET_PITCH_DEG, 0.0f,
-                         0.5f, 0.5f, &output);
+                         0.5f, 0.5f, 0.0f, 0.0f, 0.0f, &output);
     }
     assert(output.target_tilt_deg < BALANCE_ANGLE_TARGET_PITCH_DEG);
     assert(output.left_pwm > 0 && output.right_pwm > 0);
     app_balance_step(&control, 1U, 0.0f,
                      BALANCE_UPRIGHT_PITCH_DEG + 46.0f, 0.0f,
-                     0.0f, 0.0f, &output);
+                     0.0f, 0.0f, 0.0f, 0.0f, 0.0f, &output);
     assert(output.left_pwm == 0 && output.right_pwm == 0);
     assert(control.speed_elapsed_ms == 0U);
+    app_balance_reset(&control);
+    app_balance_set_steering_enabled(&control, 1U);
+    app_balance_step(&control, 1U, 0.0f,
+                     BALANCE_ANGLE_TARGET_PITCH_DEG, 0.0f,
+                     0.0f, 0.0f, 90.0f, 0.0f, 0.0f, &output);
+    assert(output.left_pwm < 0 && output.right_pwm > 0);
+    assert(output.left_pwm == -output.right_pwm);
+    app_balance_reset(&control);
+    app_balance_set_steering_enabled(&control, 1U);
+    app_balance_step(&control, 1U, 0.0f,
+                     BALANCE_ANGLE_TARGET_PITCH_DEG, 0.0f,
+                     0.0f, 0.0f, 179.0f, -179.0f, 0.0f, &output);
+    assert(output.left_pwm > 0 && output.right_pwm < 0);
+    app_balance_reset(&control);
+    app_balance_set_steering_enabled(&control, 1U);
+    app_balance_step(&control, 1U, 0.0f,
+                     BALANCE_ANGLE_TARGET_PITCH_DEG, 0.0f,
+                     0.0f, 0.0f, -179.0f, 179.0f, 0.0f, &output);
+    assert(output.left_pwm < 0 && output.right_pwm > 0);
+    app_balance_reset(&control);
     assert(app_balance_update_pid(&control, SERIAL_PID_CONTROLLER_ANGLE,
                                  SERIAL_PID_GAIN_KP, 321.5f) == 1U);
     assert(fabsf(control.angle.kp - 321.5f) < 0.001f);

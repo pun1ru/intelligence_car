@@ -1,6 +1,7 @@
 #include "send_task.h"
 
 #include "app_serial.h"
+#include "app_calibration.h"
 #include "control_task.h"
 #include "receive_task.h"
 #include "state_task.h"
@@ -21,6 +22,8 @@ void send_task(void *pvParameters)
         app_attitude_t attitude;
         app_imu_sample_t imu;
         app_control_telemetry_t motion;
+        app_gyro_calibration_result_t gyro_calibration;
+        app_serial_calibration_t calibration_telemetry;
         uint32_t metric_start = task_metrics_begin();
         telemetry.uptime_ms = (uint32_t)xTaskGetTickCount() * portTICK_PERIOD_MS;
         if (state_task_get_snapshot(&state) != 0U)
@@ -65,8 +68,20 @@ void send_task(void *pvParameters)
                 telemetry.left_delta_count = motion.left_delta_count;
                 telemetry.right_delta_count = motion.right_delta_count;
             }
+            if (motion.lift_detected != 0U)
+            {
+                telemetry.valid |= SERIAL_VALID_LIFT;
+            }
         }
         app_serial_send(&telemetry);
+        app_calibration_gyro_result(&gyro_calibration);
+        calibration_telemetry.active = gyro_calibration.active;
+        calibration_telemetry.complete = gyro_calibration.complete;
+        calibration_telemetry.sample_count = gyro_calibration.bias_sample_count;
+        calibration_telemetry.gyro_bias_x_dps = gyro_calibration.gyro_bias_dps[0];
+        calibration_telemetry.gyro_bias_y_dps = gyro_calibration.gyro_bias_dps[1];
+        calibration_telemetry.gyro_bias_z_dps = gyro_calibration.gyro_bias_dps[2];
+        app_serial_send_calibration(&calibration_telemetry);
         task_metrics_end(TASK_METRIC_SEND, metric_start);
         vTaskDelayUntil(&last_wake_tick, pdMS_TO_TICKS(SEND_TASK_PERIOD_MS));
     }

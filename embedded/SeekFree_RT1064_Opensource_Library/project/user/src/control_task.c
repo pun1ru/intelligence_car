@@ -60,6 +60,16 @@ void control_task(void *pvParameters)
                 state_snapshot->pid_parameter,
                 state_snapshot->pid_value);
         }
+        if (state_snapshot != NULL)
+        {
+            app_control_apply_feedforward(
+                state_snapshot->wheel_feedforward_gain);
+            app_control_apply_steering_feedforward(
+                state_snapshot->steering_feedforward_gain);
+            app_control_set_steering_enabled(
+                (state_snapshot->vehicle_mode == APP_VEHICLE_SUPPORT) ?
+                0U : state_snapshot->steering_enabled);
+        }
         if (app_control_step(state_snapshot, attitude_snapshot) != 0U)
         {
             state_task_request_protection();

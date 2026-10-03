@@ -4,4 +4,27 @@
 
 在工程根目录执行 `python -m pip install -r upper/requirements.txt`，然后执行 `python upper/main.py`。选择电脑上的串口并连接。Windows 无需另装 Tkinter。车辆每 100 ms 发一帧遥测；界面每 100 ms 发心跳。关闭或断开时发送保护请求；无线链路中断 500 ms 后，车端自行进入保护。
 
-进入平衡/导航仍需车体处于直立范围、C15 未按下、C26/C27 均关闭。支撑平衡是独立状态，要求 Pitch 约为 -97 度，进入后默认目标 Pitch 为 -97 度且速度目标为 0；普通平衡状态在 -100~-96 度保持 500 ms 会自动进入，保护状态不会自动进入。支撑平衡仍可接收速度目标，正速度会让车体向前；Pitch 连续超过 -96 度 100 ms 后自动切回普通平衡并清零速度目标。导航当前只保留平衡。速度输入范围 ±1 m/s；Yaw 目标可以传输和回显，但车端转向闭环尚未实现。Online PID tuning 可分别修改轮速、姿态角度和速度环的 Kp/Ki/Kd；每次应用参数都会让车端进入保护并清零输出，修改后需要重新发送平衡、导航或支撑平衡命令。操作后以回传的车体状态和目标值为准，不能将发送成功当作执行成功。完整帧格式见 `docs/SERIAL_PROTOCOL.md`。
+进入平衡/导航仍需车体处于直立范围、C15 未按下、C26/C27 均关闭。支撑平衡是独立状态，要求 Pitch 约为 -97 度，进入后默认目标 Pitch 为 -97 度且速度目标为 0；普通平衡状态在 -100~-96 度保持 500 ms 会自动进入，保护状态不会自动进入。支撑平衡仍可接收速度目标，正速度会让车体向前；Pitch 连续超过 -96 度 100 ms 后自动切回普通平衡并清零速度目标。导航当前只保留平衡。速度输入范围 ±1 m/s；启用转向环后，Yaw 目标通过左右轮差速控制，速度目标为 0 时左右轮反向、车体绕中心旋转。Online PID tuning 可分别修改轮速、姿态角度、速度和转向环的 Kp/Ki/Kd；每次应用参数都会让车端进入保护并清零输出，修改后需要重新发送平衡、导航或支撑平衡命令。操作后以回传的车体状态和目标值为准，不能将发送成功当作执行成功。完整帧格式见 `docs/SERIAL_PROTOCOL.md`。
+The current console includes a selectable realtime chart for vehicle speed,
+pitch target/actual, wheel speed/derived target, or IMU Euler angles. The
+trajectory tab fuses signed wheel speed with measured yaw and draws metres
+with a scale bar. Vehicle state shows the encoder based lift diagnostic.
+Keyboard mode sends configurable W/S speed and continuously changes the A/D
+yaw target while the key is held; the yaw rate is configured in degrees per
+second and the vehicle controller follows the shortest angular error.
+The steering loop uses the lower default gains (`Kp=100`, `Ki=2`) plus an
+angle based feedforward gain in `PWM/deg`, configurable from the PID panel.
+The wheel speed loop has a speed error feedforward gain in `PWM/(m/s)` in the
+same panel. While the vehicle side reports the lift diagnostic bit, the trajectory
+integrator freezes and resets its time origin so airborne wheel motion cannot
+create drift.
+
+Support mode disables steering control and clears its steering integral. On the
+return to Balance, the current measured Yaw becomes the new target to avoid a
+differential output step. The speed loop uses `Kp=16` with a `+15/-5 degree`
+forward/backward pitch limit.
+
+The realtime chart tab places the current values for the selected curves beside
+the plot. The trajectory tab uses a body frame captured when the trajectory is
+reset: `+X` is the vehicle forward direction and `+Y` is the vehicle left
+direction, both shown with arrows and metre units.

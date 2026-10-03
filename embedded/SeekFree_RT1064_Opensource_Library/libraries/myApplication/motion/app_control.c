@@ -27,6 +27,9 @@ static float speed_right_sum_m_s;
 static float speed_left_m_s;
 static float speed_right_m_s;
 static uint32_t speed_sample_count;
+static uint32_t wheel_lift_age_ms;
+static uint32_t wheel_lift_clear_age_ms;
+static uint8_t wheel_lift_detected;
 static app_control_telemetry_t control_telemetry;
 
 uint8_t app_control_apply_pid_update(uint8_t controller, uint8_t parameter,
@@ -49,6 +52,42 @@ uint8_t app_control_apply_pid_update(uint8_t controller, uint8_t parameter,
     return updated;
 }
 
+void app_control_apply_feedforward(float value)
+{
+    if (wheel_test_initialized == 0U)
+    {
+        app_balance_init(&wheel_test_control);
+        app_balance_init(&angle_control);
+        wheel_test_initialized = 1U;
+    }
+    app_balance_set_wheel_feedforward(&wheel_test_control, value);
+    app_balance_set_wheel_feedforward(&angle_control, value);
+}
+
+void app_control_apply_steering_feedforward(float value)
+{
+    if (wheel_test_initialized == 0U)
+    {
+        app_balance_init(&wheel_test_control);
+        app_balance_init(&angle_control);
+        wheel_test_initialized = 1U;
+    }
+    app_balance_set_steering_feedforward(&wheel_test_control, value);
+    app_balance_set_steering_feedforward(&angle_control, value);
+}
+
+void app_control_set_steering_enabled(uint8_t enabled)
+{
+    if (wheel_test_initialized == 0U)
+    {
+        app_balance_init(&wheel_test_control);
+        app_balance_init(&angle_control);
+        wheel_test_initialized = 1U;
+    }
+    app_balance_set_steering_enabled(&wheel_test_control, enabled);
+    app_balance_set_steering_enabled(&angle_control, enabled);
+}
+
 void app_control_get_telemetry(app_control_telemetry_t *telemetry)
 {
     if (telemetry != NULL)
@@ -57,8 +96,94 @@ void app_control_get_telemetry(app_control_telemetry_t *telemetry)
         telemetry->left_speed_m_s = speed_left_m_s;
         telemetry->right_speed_m_s = speed_right_m_s;
         telemetry->target_pitch_deg = angle_control.target_tilt_deg;
+        telemetry->lift_detected = wheel_lift_detected;
         drv_motion_get_signed(&telemetry->left_pwm, &telemetry->right_pwm);
     }
+}
+
+static uint32_t saturating_add_ms(uint32_t value, uint32_t increment)
+{
+    return (UINT32_MAX - value < increment) ? UINT32_MAX : value + increment;
+}
+
+static void reset_lift_detection(void)
+{
+    wheel_lift_age_ms = 0U;
+    wheel_lift_clear_age_ms = 0U;
+    wheel_lift_detected = 0U;
+    control_telemetry.lift_detected = 0U;
+}
+
+static void update_lift_detection(const app_state_t *state,
+                                  const app_encoder_motion_t *motion,
+                                  uint8_t sample_valid)
+{
+    float left_speed;
+    float right_speed;
+    float target_speed = 0.0f;
+    float max_speed;
+    float speed_difference;
+    float max_pwm;
+    int16_t left_pwm = 0;
+    int16_t right_pwm = 0;
+    uint8_t abnormal = 0U;
+    uint8_t steering_active = 0U;
+
+    if ((sample_valid != 0U) && (motion != NULL))
+    {
+        left_speed = fabsf(motion->left.speed_m_s);
+        right_speed = fabsf(motion->right.speed_m_s);
+        max_speed = (left_speed > right_speed) ? left_speed : right_speed;
+        speed_difference = fabsf(motion->left.speed_m_s -
+                                 motion->right.speed_m_s);
+        if ((state != NULL) && isfinite(state->target_speed_m_s))
+        {
+            target_speed = state->target_speed_m_s;
+            steering_active = (state->steering_enabled != 0U) &&
+                              (state->vehicle_mode != APP_VEHICLE_SUPPORT);
+        }
+        drv_motion_get_signed(&left_pwm, &right_pwm);
+        max_pwm = (fabsf((float)left_pwm) > fabsf((float)right_pwm)) ?
+                  fabsf((float)left_pwm) : fabsf((float)right_pwm);
+
+        /* Encoder speed alone cannot prove that the chassis is airborne. A
+         * motor command gate rejects hand-spun wheels while protected, and
+         * the three speed tests cover runaway speed, free spin at zero target,
+         * and one-wheel abnormality. */
+        if ((max_pwm >= VEHICLE_LIFT_MIN_PWM_DUTY) &&
+            ((max_speed >= VEHICLE_LIFT_MAX_WHEEL_SPEED_MPS) ||
+             ((steering_active == 0U) &&
+              (fabsf(target_speed) <= VEHICLE_LIFT_TARGET_SPEED_EPS_MPS) &&
+              (max_speed >= VEHICLE_LIFT_FREE_SPIN_SPEED_MPS)) ||
+             ((steering_active == 0U) &&
+              (max_speed >= VEHICLE_LIFT_MIN_SPEED_MPS) &&
+              (speed_difference >= VEHICLE_LIFT_SPEED_DIFF_MPS))))
+        {
+            abnormal = 1U;
+        }
+    }
+
+    if (abnormal != 0U)
+    {
+        wheel_lift_age_ms = saturating_add_ms(
+            wheel_lift_age_ms, WHEEL_SPEED_LOOP_PERIOD_MS);
+        wheel_lift_clear_age_ms = 0U;
+        if (wheel_lift_age_ms >= VEHICLE_LIFT_DETECT_MS)
+        {
+            wheel_lift_detected = 1U;
+        }
+    }
+    else
+    {
+        wheel_lift_age_ms = 0U;
+        wheel_lift_clear_age_ms = saturating_add_ms(
+            wheel_lift_clear_age_ms, WHEEL_SPEED_LOOP_PERIOD_MS);
+        if (wheel_lift_clear_age_ms >= VEHICLE_LIFT_CLEAR_MS)
+        {
+            wheel_lift_detected = 0U;
+        }
+    }
+    control_telemetry.lift_detected = wheel_lift_detected;
 }
 
 static void reset_speed_feedback(void)
@@ -69,6 +194,7 @@ static void reset_speed_feedback(void)
     speed_right_m_s = 0.0f;
     speed_sample_count = 0U;
     control_telemetry.wheel_valid = 0U;
+    reset_lift_detection();
 }
 
 static uint16_t test_duty(int32_t pwm)
@@ -131,6 +257,7 @@ uint8_t app_control_step(const app_state_t *state,
                 speed_sample_count = 0U;
             }
         }
+        update_lift_detection(state, &motion, sample_valid);
     }
     test_enabled = drv_io_calibration_switches_on();
     if (test_enabled != 0U)
@@ -213,9 +340,18 @@ uint8_t app_control_step(const app_state_t *state,
         (state->vehicle_mode == APP_VEHICLE_SUPPORT) ?
         BALANCE_SUPPORT_TARGET_PITCH_DEG : BALANCE_ANGLE_TARGET_PITCH_DEG);
 
+    app_balance_set_wheel_feedforward(&angle_control,
+                                      state->wheel_feedforward_gain);
+    app_balance_set_steering_feedforward(&angle_control,
+                                         state->steering_feedforward_gain);
+    app_balance_set_steering_enabled(&angle_control,
+        (state->vehicle_mode == APP_VEHICLE_SUPPORT) ?
+        0U : state->steering_enabled);
     app_balance_step(&angle_control, 1U, state->target_speed_m_s,
                      attitude->pitch, attitude->pitch_rate_dps,
-                     speed_left_m_s, speed_right_m_s, &output);
+                     speed_left_m_s, speed_right_m_s,
+                     state->target_yaw_deg, attitude->yaw,
+                     attitude->yaw_rate_dps, &output);
     app_balance_apply(&output);
     return 0U;
 }

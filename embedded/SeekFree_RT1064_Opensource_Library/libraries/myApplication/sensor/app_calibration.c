@@ -181,6 +181,25 @@ void app_calibration_gyro_complete(void)
     app_gyro_calibration_finish(&gyro_calibration);
 }
 
+void app_calibration_gyro_bias_complete(void)
+{
+    uint8_t axis;
+
+    gyro_calibration.result.bias_sample_count =
+        gyro_calibration.bias_stats.count;
+    for (axis = 0U; axis < 3U; axis++)
+    {
+        gyro_calibration.result.gyro_bias_dps[axis] =
+            gyro_calibration.bias_stats.mean[axis];
+        gyro_calibration.result.gyro_noise_variance_dps2[axis] = 0.0f;
+        gyro_calibration.result.gyro_noise_stddev_dps[axis] = 0.0f;
+    }
+    gyro_calibration.result.noise_sample_count = 0U;
+    gyro_calibration.result.active = 0U;
+    gyro_calibration.result.complete =
+        (gyro_calibration.bias_stats.count > 1U) ? 1U : 0U;
+}
+
 void app_calibration_gyro_result(app_gyro_calibration_result_t *result)
 {
     if (result != NULL)

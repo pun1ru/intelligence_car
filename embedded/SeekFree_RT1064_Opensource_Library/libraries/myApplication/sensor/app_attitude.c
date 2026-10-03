@@ -28,10 +28,20 @@ void app_attitude_reset(void)
 void app_attitude_apply_calibration(const app_gyro_calibration_result_t *gyro,
                                     const app_accel_calibration_result_t *accel)
 {
-    uint8_t axis;
-
     if ((gyro == NULL) || (accel == NULL) ||
         (gyro->complete == 0U) || (accel->complete == 0U))
+    {
+        return;
+    }
+    app_attitude_apply_gyro_calibration(gyro);
+}
+
+void app_attitude_apply_gyro_calibration(
+    const app_gyro_calibration_result_t *gyro)
+{
+    uint8_t axis;
+
+    if ((gyro == NULL) || (gyro->complete == 0U))
     {
         return;
     }
@@ -84,7 +94,9 @@ uint8_t app_attitude_step(const app_imu_sample_t *sample, float dt_s,
                      APP_IMU_RAD_TO_DEG * ATTITUDE_ROLL_SIGN;
     attitude->yaw = attitude_filter.euler[MADGWICK_YAW] * APP_IMU_RAD_TO_DEG;
     attitude->pitch_rate_dps = sample->gyro_x_dps - gyro_bias_dps[0];
+    attitude->yaw_rate_dps = sample->gyro_z_dps - gyro_bias_dps[2];
     return (isfinite(attitude->roll) && isfinite(attitude->pitch) &&
             isfinite(attitude->yaw) &&
-            isfinite(attitude->pitch_rate_dps)) ? 1U : 0U;
+            isfinite(attitude->pitch_rate_dps) &&
+            isfinite(attitude->yaw_rate_dps)) ? 1U : 0U;
 }

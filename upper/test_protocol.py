@@ -2,8 +2,10 @@ import struct
 import unittest
 
 from protocol import (
-    BALANCE, MOTION, PID_BASE, STATE, SUPPORT, TELEMETRY_LENGTH, TelemetryParser,
-    command_frame, crc16, decode_telemetry, pid_frame,
+    BALANCE, FEEDFORWARD, MOTION, PID_BASE, STATE, STEERING_FEEDFORWARD,
+    SUPPORT, TELEMETRY_LENGTH, TelemetryParser, command_frame, crc16,
+    decode_telemetry, feedforward_frame, pid_frame,
+    steering_feedforward_frame,
 )
 
 
@@ -33,6 +35,12 @@ class ProtocolTest(unittest.TestCase):
         self.assertEqual(frame[2], PID_BASE + 3)
         self.assertEqual(struct.unpack_from("<f", frame, 3)[0], 300.0)
         self.assertEqual(frame[7], 0x86)
+        wheel_ff = feedforward_frame(12.25)
+        self.assertEqual(wheel_ff[2], FEEDFORWARD)
+        self.assertEqual(struct.unpack_from("<h", wheel_ff, 3)[0], 12)
+        steering_ff = steering_feedforward_frame(4.25)
+        self.assertEqual(steering_ff[2], STEERING_FEEDFORWARD)
+        self.assertEqual(struct.unpack_from("<h", steering_ff, 3)[0], 4)
 
     def test_telemetry_round_trip_and_resync(self):
         frame = sample_frame()

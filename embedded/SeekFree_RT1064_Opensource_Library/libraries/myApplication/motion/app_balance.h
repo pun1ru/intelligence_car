@@ -10,9 +10,13 @@ typedef struct
     control_pid_t wheel_right;
     control_pid_t angle;
     control_pid_t speed;
+    control_pid_t steering;
     float base_pitch_deg;
     float target_tilt_deg;
+    float wheel_feedforward_gain;
+    float steering_feedforward_gain;
     uint32_t speed_elapsed_ms;
+    uint8_t steering_enabled;
 } app_balance_t;
 
 typedef struct
@@ -24,6 +28,9 @@ typedef struct
 
 uint8_t app_balance_update_pid(app_balance_t *control, uint8_t controller,
                                uint8_t parameter, float value);
+void app_balance_set_wheel_feedforward(app_balance_t *control, float value);
+void app_balance_set_steering_feedforward(app_balance_t *control, float value);
+void app_balance_set_steering_enabled(app_balance_t *control, uint8_t enabled);
 void app_balance_set_pitch_target(app_balance_t *control, float target_pitch_deg);
 
 void app_balance_init(app_balance_t *control);
@@ -39,7 +46,9 @@ void app_balance_angle_step(app_balance_t *control, uint8_t enabled,
 void app_balance_step(app_balance_t *control, uint8_t enabled,
                       float target_speed_m_s, float pitch_deg,
                       float pitch_rate_dps, float left_speed_m_s,
-                      float right_speed_m_s, app_balance_output_t *output);
+                      float right_speed_m_s, float target_yaw_deg,
+                      float yaw_deg, float yaw_rate_dps,
+                      app_balance_output_t *output);
 void app_balance_apply(const app_balance_output_t *output);
 
 #endif

@@ -17,4 +17,5 @@
   ..\..\libraries\myApplication\sensor\app_attitude.h \
   ..\..\libraries\myApplication\sensor\app_sensor.h \
   ..\..\libraries\myApplication\sensor\app_calibration.h \
-  ..\..\libraries\Freertos\include\semphr.h ..\user\inc\task_metrics.h
+  ..\..\libraries\Freertos\include\semphr.h ..\user\inc\task_metrics.h \
+  C:\Keil_v5\ARM\ARMCLANG\Bin\..\include\math.h

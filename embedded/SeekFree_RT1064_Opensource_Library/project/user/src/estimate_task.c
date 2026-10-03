@@ -46,6 +46,7 @@ void estimate_task(void *pvParameters)
     uint32_t request;
     uint8_t calibration_active = 0U;
     uint8_t calibration_invalid = 0U;
+    uint8_t gyro_bias_only = 0U;
 
     (void)pvParameters;
     estimate_handle = xTaskGetCurrentTaskHandle();
@@ -71,6 +72,16 @@ void estimate_task(void *pvParameters)
             calibration_start = xTaskGetTickCount();
             last_calibration_sample = 0U;
             calibration_invalid = 0U;
+            gyro_bias_only = 0U;
+            calibration_active = 1U;
+        }
+        else if ((request & ESTIMATE_REQUEST_GYRO_BIAS) != 0U)
+        {
+            app_calibration_gyro_start();
+            calibration_start = xTaskGetTickCount();
+            last_calibration_sample = 0U;
+            calibration_invalid = 0U;
+            gyro_bias_only = 1U;
             calibration_active = 1U;
         }
         if ((g_imu_data_ready_sem != NULL) &&
@@ -89,29 +100,54 @@ void estimate_task(void *pvParameters)
                 }
                 else
                 {
-                    app_calibration_accel_sample(&sample);
-                    if (elapsed < pdMS_TO_TICKS(IMU_GYRO_CALIBRATION_TIME_MS / 2U))
+                    if (gyro_bias_only != 0U)
                     {
                         app_calibration_gyro_bias_sample(&sample);
                     }
                     else
                     {
-                        app_calibration_gyro_noise_sample(&sample);
+                        app_calibration_accel_sample(&sample);
+                        if (elapsed < pdMS_TO_TICKS(IMU_GYRO_CALIBRATION_TIME_MS / 2U))
+                        {
+                            app_calibration_gyro_bias_sample(&sample);
+                        }
+                        else
+                        {
+                            app_calibration_gyro_noise_sample(&sample);
+                        }
                     }
                 }
                 if (elapsed >= pdMS_TO_TICKS(IMU_GYRO_CALIBRATION_TIME_MS))
                 {
                     calibration_active = 0U;
-                    app_calibration_gyro_complete();
-                    app_calibration_accel_complete();
-                    app_calibration_gyro_result(&gyro_result);
-                    app_calibration_accel_result(&accel_result);
-                    if ((calibration_invalid == 0U) &&
-                        (gyro_result.bias_sample_count >= IMU_CALIBRATION_MIN_SAMPLES) &&
-                        (gyro_result.noise_sample_count >= IMU_CALIBRATION_MIN_SAMPLES) &&
-                        (accel_result.sample_count >= IMU_CALIBRATION_MIN_SAMPLES))
+                    if (gyro_bias_only != 0U)
                     {
-                        app_attitude_apply_calibration(&gyro_result, &accel_result);
+                        app_calibration_gyro_bias_complete();
+                    }
+                    else
+                    {
+                        app_calibration_gyro_complete();
+                    }
+                    app_calibration_gyro_result(&gyro_result);
+                    if (gyro_bias_only != 0U)
+                    {
+                        if ((calibration_invalid == 0U) &&
+                            (gyro_result.bias_sample_count >= IMU_CALIBRATION_MIN_SAMPLES))
+                        {
+                            app_attitude_apply_gyro_calibration(&gyro_result);
+                        }
+                    }
+                    else
+                    {
+                        app_calibration_accel_complete();
+                        app_calibration_accel_result(&accel_result);
+                        if ((calibration_invalid == 0U) &&
+                            (gyro_result.bias_sample_count >= IMU_CALIBRATION_MIN_SAMPLES) &&
+                            (gyro_result.noise_sample_count >= IMU_CALIBRATION_MIN_SAMPLES) &&
+                            (accel_result.sample_count >= IMU_CALIBRATION_MIN_SAMPLES))
+                        {
+                            app_attitude_apply_calibration(&gyro_result, &accel_result);
+                        }
                     }
                 }
             }

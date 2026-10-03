@@ -34,6 +34,7 @@ void app_calibration_gyro_start(void);
 void app_calibration_gyro_bias_sample(const app_imu_sample_t *sample);
 void app_calibration_gyro_noise_sample(const app_imu_sample_t *sample);
 void app_calibration_gyro_complete(void);
+void app_calibration_gyro_bias_complete(void);
 void app_calibration_gyro_result(app_gyro_calibration_result_t *result);
 
 #endif

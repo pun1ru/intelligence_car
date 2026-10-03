@@ -10,6 +10,8 @@
 #include "task.h"
 #include "task_metrics.h"
 
+#include <math.h>
+
 #define STATE_TASK_PROTECT_REQUEST 1U
 
 typedef struct
@@ -53,6 +55,7 @@ void state_task(void *pvParameters)
     app_serial_command_t command;
     state_snapshot_t snapshot;
     app_control_mode_t previous_mode;
+    app_vehicle_mode_t previous_vehicle_mode;
     uint8_t attitude_valid;
     uint8_t command_valid;
     uint32_t request;
@@ -74,10 +77,20 @@ void state_task(void *pvParameters)
         attitude_valid = receive_attitude_snapshot(&attitude);
         command_valid = app_serial_poll_command(&command);
         previous_mode = state.control_mode;
+        previous_vehicle_mode = state.vehicle_mode;
         app_state_step(&state, &buttons, attitude_valid,
                        (attitude_valid != 0U) ? attitude.pitch : 0.0f,
                        STATE_TASK_PERIOD_MS,
                        (command_valid != 0U) ? &command : NULL);
+        if ((previous_vehicle_mode == APP_VEHICLE_SUPPORT) &&
+            (state.vehicle_mode == APP_VEHICLE_BALANCE) &&
+            (attitude_valid != 0U) && isfinite(attitude.yaw))
+        {
+            /* Start the balance yaw loop from the actual heading.  The
+             * support state deliberately does not steer, so a zeroed target
+             * would create a differential PWM step at this transition. */
+            state.target_yaw_deg = attitude.yaw;
+        }
         request = 0U;
         (void)xTaskNotifyWait(0U, UINT32_MAX, &request, 0U);
         if ((request & STATE_TASK_PROTECT_REQUEST) != 0U)
@@ -91,6 +104,10 @@ void state_task(void *pvParameters)
             (state.control_mode != APP_STATE_CALIBRATION))
         {
             estimate_task_request(ESTIMATE_REQUEST_CANCEL);
+        }
+        else if (state.gyro_bias_calibrate_requested != 0U)
+        {
+            estimate_task_request(ESTIMATE_REQUEST_GYRO_BIAS);
         }
         else if (state.calibrate_requested != 0U)
         {

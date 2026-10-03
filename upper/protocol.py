@@ -14,8 +14,13 @@ STATE = 1
 SPEED = 2
 YAW = 3
 MOTION = 4
+FEEDFORWARD = 5
+CALIBRATE = 6
+STEERING = 7
+STEERING_FEEDFORWARD = 8
 PID_BASE = 0x50
-PID_LAST = 0x58
+PID_LAST = 0x5B
+PID_STEERING = 3
 PROTECT = 0
 BALANCE = 1
 NAVIGATION = 2
@@ -25,10 +30,15 @@ VALID_ATTITUDE = 2
 VALID_IMU = 4
 VALID_MOTION = 8
 VALID_CONTROL = 16
+# Vehicle-side lift/airborne diagnostic flag.  The fixed telemetry frame keeps
+# this in the valid bit field so older firmware remains wire-compatible.
+VALID_LIFT = 32
+CALIBRATION_LENGTH = 24
+CALIBRATION_TYPE = 0x81
 
 
 def pid_frame(controller: int, gain: int, value: float) -> bytes:
-    if controller not in (0, 1, 2) or gain not in (0, 1, 2):
+    if controller not in (0, 1, 2, 3) or gain not in (0, 1, 2):
         raise ValueError("unknown PID controller or gain")
     if not math.isfinite(value) or not 0.0 <= value <= 10000.0:
         raise ValueError("PID gain must be between 0 and 10000")
@@ -41,12 +51,21 @@ def pid_frame(controller: int, gain: int, value: float) -> bytes:
 
 
 def command_frame(command: int, value: int = 0, value2: int = 0) -> bytes:
-    if command not in (HEARTBEAT, STATE, SPEED, YAW, MOTION):
+    if command not in (HEARTBEAT, STATE, SPEED, YAW, MOTION,
+                       FEEDFORWARD, CALIBRATE, STEERING, STEERING_FEEDFORWARD):
         raise ValueError("unknown command")
     if command != MOTION and value2 != 0:
         raise ValueError("reserved value must be zero")
     if command == STATE and value not in (PROTECT, BALANCE, NAVIGATION, SUPPORT):
         raise ValueError("invalid state")
+    if command == CALIBRATE and (value != 0 or value2 != 0):
+        raise ValueError("calibration command takes no value")
+    if command == STEERING and (value not in (0, 1) or value2 != 0):
+        raise ValueError("invalid steering enable")
+    if command == FEEDFORWARD and (value < 0 or value2 != 0):
+        raise ValueError("invalid feedforward value")
+    if command == STEERING_FEEDFORWARD and (value < 0 or value2 != 0):
+        raise ValueError("invalid steering feedforward value")
     if not (-32768 <= value <= 32767 and -32768 <= value2 <= 32767):
         raise ValueError("command value outside int16")
     body = struct.pack("<Bhh", command, value, value2)
@@ -54,6 +73,26 @@ def command_frame(command: int, value: int = 0, value2: int = 0) -> bytes:
     for byte in body:
         checksum ^= byte
     return COMMAND_SYNC + body + bytes((checksum,))
+
+
+def feedforward_frame(value: float) -> bytes:
+    if not math.isfinite(value) or not 0.0 <= value <= 10000.0:
+        raise ValueError("wheel feedforward gain must be between 0 and 10000")
+    return command_frame(FEEDFORWARD, round(value))
+
+
+def calibration_frame() -> bytes:
+    return command_frame(CALIBRATE)
+
+
+def steering_frame(enabled: bool) -> bytes:
+    return command_frame(STEERING, 1 if enabled else 0)
+
+
+def steering_feedforward_frame(value: float) -> bytes:
+    if not math.isfinite(value) or not 0.0 <= value <= 1000.0:
+        raise ValueError("steering feedforward gain must be between 0 and 1000")
+    return command_frame(STEERING_FEEDFORWARD, round(value))
 
 
 def crc16(data: bytes) -> int:
@@ -93,6 +132,17 @@ class Telemetry:
     target_pitch_deg: float
 
 
+@dataclass(frozen=True)
+class CalibrationTelemetry:
+    sequence: int
+    active: bool
+    complete: bool
+    sample_count: int
+    gyro_bias_x_dps: float
+    gyro_bias_y_dps: float
+    gyro_bias_z_dps: float
+
+
 def decode_telemetry(frame: bytes) -> Telemetry:
     if len(frame) != TELEMETRY_LENGTH or frame[:2] != TELEMETRY_SYNC:
         raise ValueError("invalid frame boundary")
@@ -121,12 +171,29 @@ def decode_telemetry(frame: bytes) -> Telemetry:
     )
 
 
+def decode_calibration(frame: bytes) -> CalibrationTelemetry:
+    if len(frame) != CALIBRATION_LENGTH or frame[:2] != TELEMETRY_SYNC:
+        raise ValueError("invalid calibration frame boundary")
+    if frame[2:4] != bytes((VERSION, CALIBRATION_TYPE)):
+        raise ValueError("unsupported calibration version or type")
+    if crc16(frame[:-2]) != struct.unpack_from("<H", frame, 22)[0]:
+        raise ValueError("calibration CRC mismatch")
+    flags = frame[5]
+    return CalibrationTelemetry(
+        sequence=frame[4], active=bool(flags & 1), complete=bool(flags & 2),
+        sample_count=struct.unpack_from("<I", frame, 6)[0],
+        gyro_bias_x_dps=struct.unpack_from("<h", frame, 10)[0] / 100,
+        gyro_bias_y_dps=struct.unpack_from("<h", frame, 12)[0] / 100,
+        gyro_bias_z_dps=struct.unpack_from("<h", frame, 14)[0] / 100,
+    )
+
+
 class TelemetryParser:
     def __init__(self) -> None:
         self.buffer = bytearray()
         self.bad_frames = 0
 
-    def feed(self, data: bytes) -> list[Telemetry]:
+    def feed(self, data: bytes) -> list[Telemetry | CalibrationTelemetry]:
         self.buffer.extend(data)
         frames = []
         while len(self.buffer) >= 2:
@@ -136,14 +203,20 @@ class TelemetryParser:
                 break
             if start:
                 del self.buffer[:start]
-            if len(self.buffer) < TELEMETRY_LENGTH:
+            if len(self.buffer) < 4:
+                break
+            frame_length = (CALIBRATION_LENGTH if self.buffer[3] == CALIBRATION_TYPE
+                            else TELEMETRY_LENGTH)
+            if len(self.buffer) < frame_length:
                 break
             try:
-                frame = decode_telemetry(self.buffer[:TELEMETRY_LENGTH])
+                frame = (decode_calibration(self.buffer[:frame_length])
+                         if frame_length == CALIBRATION_LENGTH
+                         else decode_telemetry(self.buffer[:TELEMETRY_LENGTH]))
             except ValueError:
                 self.bad_frames += 1
                 del self.buffer[0]
                 continue
             frames.append(frame)
-            del self.buffer[:TELEMETRY_LENGTH]
+            del self.buffer[:frame_length]
         return frames

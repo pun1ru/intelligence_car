@@ -85,19 +85,29 @@
 #define BALANCE_UPRIGHT_PITCH_DEG    -90.0f
 #define BALANCE_ANGLE_TARGET_PITCH_DEG -92.0f
 #define BALANCE_SUPPORT_TARGET_PITCH_DEG -97.0f
-#define BALANCE_ANGLE_PWM_LIMIT      3000.0f
+#define BALANCE_ANGLE_PWM_LIMIT      3500.0f
 #define ATTITUDE_ROLL_SIGN           -1.0f
-#define BALANCE_TARGET_TILT_MAX_DEG  10.0f
+#define BALANCE_TARGET_TILT_MAX_DEG  15.0f
+#define BALANCE_TARGET_TILT_FORWARD_MAX_DEG  15.0f
+#define BALANCE_TARGET_TILT_BACKWARD_MAX_DEG 5.0f
 #define BALANCE_SPEED_TARGET_MAX_MPS 1.0f
 #define WHEEL_SPEED_KP               5000.0f
 #define WHEEL_SPEED_KI               0.0f
 #define WHEEL_SPEED_KD               100.0f
+#define WHEEL_SPEED_FEEDFORWARD_PWM_PER_MPS 0.0f
 #define BALANCE_ANGLE_KP             600.0f
 #define BALANCE_ANGLE_KI             0.0f
 #define BALANCE_ANGLE_KD             30.0f
-#define BALANCE_SPEED_KP             14.0f
+#define BALANCE_SPEED_KP             16.0f
 #define BALANCE_SPEED_KI             3.0f
 #define BALANCE_SPEED_KD             0.0f
+#define BALANCE_STEERING_KP          100.0f
+#define BALANCE_STEERING_KI          2.0f
+#define BALANCE_STEERING_KD          0.0f
+#define BALANCE_STEERING_PWM_LIMIT   1000.0f
+#define BALANCE_STEERING_PWM_POLARITY 1.0f
+#define BALANCE_STEERING_FEEDFORWARD_PWM_PER_DEG 10.0f
+#define BALANCE_STEERING_ENABLE_DEFAULT 0U
 #define CONTROL_PID_D_FILTER_ALPHA   0.6f
 
 #define VEHICLE_BUTTON_DEBOUNCE_MS   30U
@@ -129,6 +139,18 @@
 #define VEHICLE_FALL_PITCH_MAX_DEG   45.0f
 #define VEHICLE_SERIAL_TIMEOUT_MS    500U
 
+/* Encoder-only lift diagnostic.  This is deliberately a telemetry flag and
+ * does not arm a protection transition: wheel speed alone cannot prove that
+ * the chassis is airborne while the vehicle is commanded to move. */
+#define VEHICLE_LIFT_MAX_WHEEL_SPEED_MPS       2.0f
+#define VEHICLE_LIFT_FREE_SPIN_SPEED_MPS       0.75f
+#define VEHICLE_LIFT_SPEED_DIFF_MPS            1.0f
+#define VEHICLE_LIFT_MIN_SPEED_MPS             0.25f
+#define VEHICLE_LIFT_TARGET_SPEED_EPS_MPS      0.05f
+#define VEHICLE_LIFT_MIN_PWM_DUTY              1000.0f
+#define VEHICLE_LIFT_DETECT_MS                 100U
+#define VEHICLE_LIFT_CLEAR_MS                  200U
+
 /* Downlink command: A5 5A command data[4] xor(command,data). */
 #define SERIAL_FRAME_SYNC_0          0xA5U
 #define SERIAL_FRAME_SYNC_1          0x5AU
@@ -138,11 +160,16 @@
 #define SERIAL_COMMAND_SPEED         0x02U
 #define SERIAL_COMMAND_YAW           0x03U
 #define SERIAL_COMMAND_MOTION        0x04U
+#define SERIAL_COMMAND_FEEDFORWARD   0x05U
+#define SERIAL_COMMAND_CALIBRATE     0x06U
+#define SERIAL_COMMAND_STEERING      0x07U
+#define SERIAL_COMMAND_STEERING_FEEDFORWARD 0x08U
 #define SERIAL_COMMAND_PID_BASE      0x50U
-#define SERIAL_COMMAND_PID_LAST      0x58U
+#define SERIAL_COMMAND_PID_LAST      0x5BU
 #define SERIAL_PID_CONTROLLER_WHEEL  0U
 #define SERIAL_PID_CONTROLLER_ANGLE  1U
 #define SERIAL_PID_CONTROLLER_SPEED  2U
+#define SERIAL_PID_CONTROLLER_STEERING 3U
 #define SERIAL_PID_GAIN_KP            0U
 #define SERIAL_PID_GAIN_KI            1U
 #define SERIAL_PID_GAIN_KD            2U
@@ -153,11 +180,17 @@
 #define SERIAL_STATE_SUPPORT         0x03U
 #define SERIAL_SPEED_SCALE_MPS       0.001f
 #define SERIAL_YAW_SCALE_DEG         0.01f
+#define SERIAL_FEEDFORWARD_SCALE     1.0f
+#define SERIAL_FEEDFORWARD_MAX_PWM_PER_MPS 10000.0f
+#define SERIAL_STEERING_FEEDFORWARD_SCALE 1.0f
+#define SERIAL_STEERING_FEEDFORWARD_MAX_PWM_PER_DEG 1000.0f
 #define SERIAL_TELEMETRY_SYNC_0      0x5AU
 #define SERIAL_TELEMETRY_SYNC_1      0xA5U
 #define SERIAL_TELEMETRY_VERSION     0x01U
 #define SERIAL_TELEMETRY_TYPE        0x80U
 #define SERIAL_TELEMETRY_LENGTH      52U
+#define SERIAL_CALIBRATION_TYPE      0x81U
+#define SERIAL_CALIBRATION_LENGTH    24U
 #define SERIAL_TELEMETRY_CRC_POLY    0x1021U
 #define SERIAL_TELEMETRY_CRC_INIT    0xFFFFU
 #define SERIAL_VALID_STATE           0x01U
@@ -165,6 +198,7 @@
 #define SERIAL_VALID_IMU             0x04U
 #define SERIAL_VALID_MOTION          0x08U
 #define SERIAL_VALID_CONTROL         0x10U
+#define SERIAL_VALID_LIFT            0x20U
 #define SERIAL_ANGLE_UNITS_PER_DEG   100.0f
 #define SERIAL_RATE_UNITS_PER_DPS    100.0f
 #define SERIAL_ACCEL_UNITS_PER_G     1000.0f

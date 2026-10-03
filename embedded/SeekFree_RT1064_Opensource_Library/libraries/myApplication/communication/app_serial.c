@@ -15,6 +15,14 @@ static void put_u16(uint8_t *frame, uint8_t offset, uint16_t value)
     frame[offset + 1U] = (uint8_t)(value >> 8U);
 }
 
+static void put_u32(uint8_t *frame, uint8_t offset, uint32_t value)
+{
+    frame[offset] = (uint8_t)value;
+    frame[offset + 1U] = (uint8_t)(value >> 8U);
+    frame[offset + 2U] = (uint8_t)(value >> 16U);
+    frame[offset + 3U] = (uint8_t)(value >> 24U);
+}
+
 static void put_scaled(uint8_t *frame, uint8_t offset, float value, float scale)
 {
     float scaled = value * scale;
@@ -160,6 +168,10 @@ uint8_t app_serial_feed_byte(app_serial_parser_t *parser, uint8_t byte,
         (command->type != SERIAL_COMMAND_SPEED) &&
         (command->type != SERIAL_COMMAND_YAW) &&
         (command->type != SERIAL_COMMAND_MOTION) &&
+        (command->type != SERIAL_COMMAND_FEEDFORWARD) &&
+        (command->type != SERIAL_COMMAND_CALIBRATE) &&
+        (command->type != SERIAL_COMMAND_STEERING) &&
+        (command->type != SERIAL_COMMAND_STEERING_FEEDFORWARD) &&
         ((command->type < SERIAL_COMMAND_PID_BASE) ||
          (command->type > SERIAL_COMMAND_PID_LAST)))
     {
@@ -176,6 +188,7 @@ uint8_t app_serial_feed_byte(app_serial_parser_t *parser, uint8_t byte,
     command->pid_controller = 0U;
     command->pid_parameter = 0U;
     command->pid_value = 0.0f;
+    command->feedforward_gain = 0.0f;
     if ((command->type >= SERIAL_COMMAND_PID_BASE) &&
         (command->type <= SERIAL_COMMAND_PID_LAST))
     {
@@ -203,6 +216,26 @@ uint8_t app_serial_feed_byte(app_serial_parser_t *parser, uint8_t byte,
         (command->value != SERIAL_STATE_SUPPORT))
     {
         return 0U;
+    }
+    if ((command->type == SERIAL_COMMAND_FEEDFORWARD) &&
+        (command->value < 0))
+    {
+        return 0U;
+    }
+    if ((command->type == SERIAL_COMMAND_CALIBRATE) &&
+        ((command->value != 0) || (command->value2 != 0)))
+    {
+        return 0U;
+    }
+    if ((command->type == SERIAL_COMMAND_STEERING) &&
+        ((command->value != 0) && (command->value != 1)))
+    {
+        return 0U;
+    }
+    if (command->type == SERIAL_COMMAND_FEEDFORWARD)
+    {
+        command->feedforward_gain =
+            (float)command->value * SERIAL_FEEDFORWARD_SCALE;
     }
     return 1U;
 }
@@ -237,6 +270,62 @@ void app_serial_send(const app_serial_telemetry_t *telemetry)
     uint8_t frame[SERIAL_TELEMETRY_LENGTH];
 
     if (app_serial_encode_telemetry(telemetry, telemetry_sequence, frame) != 0U)
+    {
+        drv_io_uart_write(frame, sizeof(frame));
+        telemetry_sequence++;
+    }
+}
+
+uint8_t app_serial_encode_calibration(
+    const app_serial_calibration_t *calibration, uint8_t sequence,
+    uint8_t frame[SERIAL_CALIBRATION_LENGTH])
+{
+    uint16_t crc = SERIAL_TELEMETRY_CRC_INIT;
+    uint8_t index;
+    uint8_t bit;
+
+    if ((calibration == NULL) || (frame == NULL))
+    {
+        return 0U;
+    }
+    frame[0] = SERIAL_TELEMETRY_SYNC_0;
+    frame[1] = SERIAL_TELEMETRY_SYNC_1;
+    frame[2] = SERIAL_TELEMETRY_VERSION;
+    frame[3] = SERIAL_CALIBRATION_TYPE;
+    frame[4] = sequence;
+    frame[5] = (uint8_t)((calibration->active != 0U) ? 1U : 0U) |
+               (uint8_t)((calibration->complete != 0U) ? 2U : 0U);
+    put_u32(frame, 6U, calibration->sample_count);
+    put_scaled(frame, 10U, calibration->gyro_bias_x_dps,
+               SERIAL_RATE_UNITS_PER_DPS);
+    put_scaled(frame, 12U, calibration->gyro_bias_y_dps,
+               SERIAL_RATE_UNITS_PER_DPS);
+    put_scaled(frame, 14U, calibration->gyro_bias_z_dps,
+               SERIAL_RATE_UNITS_PER_DPS);
+    for (index = 16U; index < SERIAL_CALIBRATION_LENGTH - 2U; index++)
+    {
+        frame[index] = 0U;
+    }
+    for (index = 0U; index < SERIAL_CALIBRATION_LENGTH - 2U; index++)
+    {
+        crc ^= (uint16_t)frame[index] << 8U;
+        for (bit = 0U; bit < 8U; bit++)
+        {
+            crc = (crc & 0x8000U) ?
+                (uint16_t)((crc << 1U) ^ SERIAL_TELEMETRY_CRC_POLY) :
+                (uint16_t)(crc << 1U);
+        }
+    }
+    put_u16(frame, SERIAL_CALIBRATION_LENGTH - 2U, crc);
+    return 1U;
+}
+
+void app_serial_send_calibration(const app_serial_calibration_t *calibration)
+{
+    uint8_t frame[SERIAL_CALIBRATION_LENGTH];
+
+    if (app_serial_encode_calibration(calibration, telemetry_sequence,
+                                      frame) != 0U)
     {
         drv_io_uart_write(frame, sizeof(frame));
         telemetry_sequence++;

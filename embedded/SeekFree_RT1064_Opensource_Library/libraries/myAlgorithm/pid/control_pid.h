@@ -18,5 +18,9 @@ void control_pid_set_derivative_filter(control_pid_t *pid, float alpha);
 void control_pid_reset(control_pid_t *pid);
 float control_pid_step(control_pid_t *pid, float setpoint, float measurement,
                        float measurement_rate, float dt_s);
+float control_pid_step_limits(control_pid_t *pid, float setpoint,
+                              float measurement, float measurement_rate,
+                              float dt_s, float positive_limit,
+                              float negative_limit);
 
 #endif

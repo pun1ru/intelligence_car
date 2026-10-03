@@ -18,6 +18,7 @@ typedef struct
     uint8_t pid_controller;
     uint8_t pid_parameter;
     float pid_value;
+    float feedforward_gain;
 } app_serial_command_t;
 
 typedef struct
@@ -47,8 +48,22 @@ typedef struct
     float target_pitch_deg;
 } app_serial_telemetry_t;
 
+typedef struct
+{
+    uint8_t active;
+    uint8_t complete;
+    uint32_t sample_count;
+    float gyro_bias_x_dps;
+    float gyro_bias_y_dps;
+    float gyro_bias_z_dps;
+} app_serial_calibration_t;
+
 void app_serial_init(void);
 void app_serial_send(const app_serial_telemetry_t *telemetry);
+void app_serial_send_calibration(const app_serial_calibration_t *calibration);
+uint8_t app_serial_encode_calibration(
+    const app_serial_calibration_t *calibration, uint8_t sequence,
+    uint8_t frame[SERIAL_CALIBRATION_LENGTH]);
 uint8_t app_serial_encode_telemetry(const app_serial_telemetry_t *telemetry,
                                     uint8_t sequence,
                                     uint8_t frame[SERIAL_TELEMETRY_LENGTH]);

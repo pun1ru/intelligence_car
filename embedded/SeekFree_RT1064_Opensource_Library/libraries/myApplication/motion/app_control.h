@@ -15,12 +15,18 @@ typedef struct
     int16_t right_pwm;
     float target_pitch_deg;
     uint8_t wheel_valid;
+    /* Set when encoder speed is abnormal while a meaningful motor command is
+     * active. This is diagnostic telemetry only and does not force protection. */
+    uint8_t lift_detected;
 } app_control_telemetry_t;
 
 uint8_t app_control_step(const app_state_t *state,
                          const app_attitude_t *attitude);
 uint8_t app_control_apply_pid_update(uint8_t controller, uint8_t parameter,
                                      float value);
+void app_control_apply_feedforward(float value);
+void app_control_apply_steering_feedforward(float value);
+void app_control_set_steering_enabled(uint8_t enabled);
 void app_control_get_telemetry(app_control_telemetry_t *telemetry);
 
 #endif
