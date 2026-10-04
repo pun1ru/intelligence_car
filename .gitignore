@@ -1,0 +1,14 @@
+# Local tool caches and generated compile database
+.cache/
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+compile_commands.json
+
+# Keil build output and per-user state
+embedded/SeekFree_RT1064_Opensource_Library/project/mdk/Objects/
+embedded/SeekFree_RT1064_Opensource_Library/project/mdk/Listings/
+embedded/SeekFree_RT1064_Opensource_Library/project/mdk/*.log
+embedded/SeekFree_RT1064_Opensource_Library/project/mdk/*.uvguix.*
+embedded/SeekFree_RT1064_Opensource_Library/project/mdk/*.uvoptx
