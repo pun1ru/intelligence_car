@@ -30,6 +30,7 @@ static uint32_t speed_sample_count;
 static uint32_t wheel_lift_age_ms;
 static uint32_t wheel_lift_clear_age_ms;
 static uint8_t wheel_lift_detected;
+static uint8_t wheel_test_active;
 static app_control_telemetry_t control_telemetry;
 
 uint8_t app_control_apply_pid_update(uint8_t controller, uint8_t parameter,
@@ -262,8 +263,15 @@ uint8_t app_control_step(const app_state_t *state,
     test_enabled = drv_io_calibration_switches_on();
     if (test_enabled != 0U)
     {
+        if (wheel_test_active == 0U)
+        {
+            /* Clear stale feedback once when the bench test starts.  Clearing
+             * it every cycle also erased the wheel-speed telemetry, so the
+             * host monitor always read zero while the test was running. */
+            reset_speed_feedback();
+        }
+        wheel_test_active = 1U;
         app_balance_reset(&angle_control);
-        reset_speed_feedback();
         left_pressed = drv_io_button_pressed(DRV_IO_BUTTON_C15);
         right_pressed = drv_io_button_pressed(DRV_IO_BUTTON_C14);
         if (left_pressed == 0U)
@@ -305,6 +313,7 @@ uint8_t app_control_step(const app_state_t *state,
     }
 
     app_balance_reset(&wheel_test_control);
+    wheel_test_active = 0U;
     test_left_duty = 0U;
     test_right_duty = 0U;
     if ((state != NULL) && (state->vehicle_mode == APP_VEHICLE_PROTECT))

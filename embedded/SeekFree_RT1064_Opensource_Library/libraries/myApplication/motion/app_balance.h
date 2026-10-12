@@ -16,6 +16,9 @@ typedef struct
     float wheel_feedforward_gain;
     float steering_feedforward_gain;
     uint32_t speed_elapsed_ms;
+    /* Previous speed-loop sample, used to derive the wheel acceleration that
+     * feeds the speed loop's derivative term. */
+    float last_average_speed_m_s;
     uint8_t steering_enabled;
 } app_balance_t;
 

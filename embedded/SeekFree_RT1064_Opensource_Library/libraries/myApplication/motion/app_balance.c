@@ -174,6 +174,7 @@ void app_balance_init(app_balance_t *control)
     control->steering_feedforward_gain =
         BALANCE_STEERING_FEEDFORWARD_PWM_PER_DEG;
     control->speed_elapsed_ms = 0U;
+    control->last_average_speed_m_s = 0.0f;
     control->steering_enabled = BALANCE_STEERING_ENABLE_DEFAULT;
 }
 
@@ -190,6 +191,7 @@ void app_balance_reset(app_balance_t *control)
     control_pid_reset(&control->steering);
     control->target_tilt_deg = control->base_pitch_deg;
     control->speed_elapsed_ms = 0U;
+    control->last_average_speed_m_s = 0.0f;
 }
 
 void app_balance_wheel_speed_step(app_balance_t *control,
@@ -263,6 +265,8 @@ void app_balance_step(app_balance_t *control, uint8_t enabled,
                       app_balance_output_t *output)
 {
     float average_speed;
+    float speed_dt_s;
+    float speed_rate_m_s2;
     float yaw_error;
     float steering_pwm;
 
@@ -290,12 +294,21 @@ void app_balance_step(app_balance_t *control, uint8_t enabled,
     if (control->speed_elapsed_ms >= BALANCE_SPEED_PERIOD_MS)
     {
         average_speed = (left_speed_m_s + right_speed_m_s) * 0.5f;
+        speed_dt_s = (float)control->speed_elapsed_ms / 1000.0f;
+        /*
+         * Feed the wheel acceleration into the derivative term.  It used to be
+         * hard-wired to zero, which left the speed loop with proportional and
+         * integral action only and no way to damp its overshoot.
+         */
+        speed_rate_m_s2 = (average_speed - control->last_average_speed_m_s) /
+                          speed_dt_s;
+        control->last_average_speed_m_s = average_speed;
         control->target_tilt_deg = control->base_pitch_deg +
             BALANCE_SPEED_TO_TILT_SIGN * control_pid_step_limits(
                 &control->speed,
                 clamp(target_speed_m_s, BALANCE_SPEED_TARGET_MAX_MPS),
-                average_speed, 0.0f,
-                (float)control->speed_elapsed_ms / 1000.0f,
+                average_speed, speed_rate_m_s2,
+                speed_dt_s,
                 BALANCE_TARGET_TILT_FORWARD_MAX_DEG,
                 BALANCE_TARGET_TILT_BACKWARD_MAX_DEG);
         control->speed_elapsed_ms = 0U;
