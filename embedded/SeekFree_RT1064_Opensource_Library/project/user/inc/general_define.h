@@ -98,10 +98,10 @@
 #define BALANCE_ANGLE_KP             600.0f
 #define BALANCE_ANGLE_KI             0.0f
 #define BALANCE_ANGLE_KD             30.0f
-#define BALANCE_SPEED_KP             16.0f
+#define BALANCE_SPEED_KP             24.0f
 #define BALANCE_SPEED_KI             3.0f
 #define BALANCE_SPEED_KD             0.0f
-#define BALANCE_STEERING_KP          100.0f
+#define BALANCE_STEERING_KP          30.0f
 #define BALANCE_STEERING_KI          2.0f
 #define BALANCE_STEERING_KD          0.0f
 #define BALANCE_STEERING_PWM_LIMIT   1000.0f
@@ -127,6 +127,7 @@
 #define VEHICLE_ATTITUDE_TIMEOUT_MS  30U
 #define VEHICLE_STATE_TIMEOUT_MS     30U
 #define VEHICLE_CONTROL_TIMEOUT_MS   30U
+#define VEHICLE_POSE_TIMEOUT_MS      50U
 #define VEHICLE_ARM_PITCH_MAX_DEG    10.0f
 #define VEHICLE_SUPPORT_ARM_PITCH_MAX_DEG 4.0f
 #define VEHICLE_SUPPORT_AUTO_MIN_PITCH_DEG -100.0f

@@ -10,14 +10,14 @@
       <TargetName>nor_sdram_zf_dtcm</TargetName>
       <ToolsetNumber>0x4</ToolsetNumber>
       <ToolsetName>ARM-ADS</ToolsetName>
-      <pArmCC>6190000::V6.19::ARMCLANG</pArmCC>
-      <pCCUsed>6190000::V6.19::ARMCLANG</pCCUsed>
+      <pArmCC>6210000::V6.21::ARMCLANG</pArmCC>
+      <pCCUsed>6210000::V6.21::ARMCLANG</pCCUsed>
       <uAC6>1</uAC6>
       <TargetOption>
         <TargetCommonOption>
           <Device>MIMXRT1064DVL6A</Device>
           <Vendor>NXP</Vendor>
-          <PackID>NXP.MIMXRT1064_DFP.25.09.00</PackID>
+          <PackID>NXP.MIMXRT1064_DFP.26.06.00</PackID>
           <PackURL>https://mcuxpresso.nxp.com/cmsis_pack/repo/</PackURL>
           <Cpu>IRAM(0x20000000,0x020000) IRAM2(0x00000000,0x020000) IROM(0x70000000,0x400000) XRAM(0x20200000,0x0c0000) CPUTYPE("Cortex-M7") FPU3(DFPU) CLOCK(12000000) ELITTLE</Cpu>
           <FlashUtilSpec></FlashUtilSpec>
@@ -341,7 +341,7 @@
               <MiscControls>-fno-common  -fdata-sections  -ffreestanding  -fno-builtin  -mthumb -Wno-invalid-source-encoding</MiscControls>
               <Define>CPU_MIMXRT1064DVL6A,SKIP_SYSCLK_INIT,XIP_EXTERNAL_FLASH=1, XIP_BOOT_HEADER_DCD_ENABLE =1, XIP_BOOT_HEADER_ENABLE =1,PRINTF_FLOAT_ENABLE=1, SCANF_FLOAT_ENABLE=1, PRINTF_ADVANCED_ENABLE=1, SCANF_ADVANCED_ENABLE=1, FSL_DRIVER_TRANSFER_DOUBLE_WEAK_IRQ=0, USB_STACK_BM, SDK_OS_FREE_RTOS, DEBUG, MCUXPRESSO_SDK, SD_ENABLED</Define>
               <Undefine></Undefine>
-              <IncludePath>..\user\inc;..\code;..\..\libraries\Freertos;..\..\libraries\Freertos\include;..\..\libraries\Freertos\portable\GCC\ARM_CM7\r0p1;..\..\libraries\Freertos\osa;..\..\libraries\sdk\CMSIS\DSP\Include;..\..\libraries\sdk\CMSIS\DSP\PrivateInclude;..\..\libraries\sdk\startup\mdk;..\..\libraries\sdk\deceive;..\..\libraries\sdk\drives;..\..\libraries\sdk\xip;..\..\libraries\sdk\utilities;..\..\libraries\sdk\utilities\debug_console;..\..\libraries\sdk\utilities\str;..\..\libraries\sdk\cmsis_drivers;..\..\libraries\sdk\CMSIS\Include;..\..\libraries\sdk\CMSIS\Driver\Include;..\..\libraries\sdk\components\lists;..\..\libraries\sdk\components\osa;..\..\libraries\sdk\components\serial_manager;..\..\libraries\sdk\components\uart;..\..\libraries\sdk\board;..\..\libraries\components\fatfs\source;..\..\libraries\components\fatfs\source\fsl_sd_disk;..\..\libraries\components\sdmmc;..\..\libraries\components\sdmmc\common;..\..\libraries\components\sdmmc\host\usdhc;..\..\libraries\components\sdmmc\osa;..\..\libraries\components\sdmmc\sd;..\..\libraries\components\usb\device;..\..\libraries\components\usb\include;..\..\libraries\components\usb\phy;..\..\libraries\components\usb\usb_cdc_adapter;..\..\libraries\zf_common;..\..\libraries\zf_driver;..\..\libraries\zf_device;..\..\libraries\zf_components;..\..\libraries\myAlgorithm;..\..\libraries\myAlgorithm\EKF;..\..\libraries\myAlgorithm\kalman;..\..\libraries\myAlgorithm\lqr;..\..\libraries\myAlgorithm\pid;..\..\libraries\myApplication\system;..\..\libraries\myApplication\sensor;..\..\libraries\myApplication\motion;..\..\libraries\myApplication\interaction;..\..\libraries\myApplication\state;..\..\libraries\myApplication\communication;..\..\libraries\myDriver;..\..\libraries\myAlgorithm\statistics;..\..\libraries\myAlgorithm\madgwick</IncludePath>
+              <IncludePath>..\user\inc;..\code;..\..\libraries\Freertos;..\..\libraries\Freertos\include;..\..\libraries\Freertos\portable\GCC\ARM_CM7\r0p1;..\..\libraries\Freertos\osa;..\..\libraries\sdk\CMSIS\DSP\Include;..\..\libraries\sdk\CMSIS\DSP\PrivateInclude;..\..\libraries\sdk\startup\mdk;..\..\libraries\sdk\deceive;..\..\libraries\sdk\drives;..\..\libraries\sdk\xip;..\..\libraries\sdk\utilities;..\..\libraries\sdk\utilities\debug_console;..\..\libraries\sdk\utilities\str;..\..\libraries\sdk\cmsis_drivers;..\..\libraries\sdk\CMSIS\Include;..\..\libraries\sdk\CMSIS\Driver\Include;..\..\libraries\sdk\components\lists;..\..\libraries\sdk\components\osa;..\..\libraries\sdk\components\serial_manager;..\..\libraries\sdk\components\uart;..\..\libraries\sdk\board;..\..\libraries\components\fatfs\source;..\..\libraries\components\fatfs\source\fsl_sd_disk;..\..\libraries\components\sdmmc;..\..\libraries\components\sdmmc\common;..\..\libraries\components\sdmmc\host\usdhc;..\..\libraries\components\sdmmc\osa;..\..\libraries\components\sdmmc\sd;..\..\libraries\components\usb\device;..\..\libraries\components\usb\include;..\..\libraries\components\usb\phy;..\..\libraries\components\usb\usb_cdc_adapter;..\..\libraries\zf_common;..\..\libraries\zf_driver;..\..\libraries\zf_device;..\..\libraries\zf_components;..\..\libraries\myAlgorithm;..\..\libraries\myAlgorithm\EKF;..\..\libraries\myAlgorithm\kalman;..\..\libraries\myAlgorithm\lqr;..\..\libraries\myAlgorithm\pid;..\..\libraries\myApplication\system;..\..\libraries\myApplication\sensor;..\..\libraries\myApplication\motion;..\..\libraries\myApplication\interaction;..\..\libraries\myApplication\state;..\..\libraries\myApplication\communication;..\..\libraries\myDriver;..\..\libraries\myAlgorithm\statistics;..\..\libraries\myAlgorithm\madgwick;..\..\libraries\myAlgorithm\odometry;..\..\libraries\myApplication\navigation</IncludePath>
             </VariousControls>
           </Cads>
           <Aads>
@@ -1422,6 +1422,36 @@
               <FileName>control_pid.h</FileName>
               <FileType>5</FileType>
               <FilePath>..\..\libraries\myAlgorithm\pid\control_pid.h</FilePath>
+            </File>
+          </Files>
+        </Group>
+        <Group>
+          <GroupName>myAlgorithm_odometry</GroupName>
+          <Files>
+            <File>
+              <FileName>odometry.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\libraries\myAlgorithm\odometry\odometry.c</FilePath>
+            </File>
+            <File>
+              <FileName>odometry.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\..\libraries\myAlgorithm\odometry\odometry.h</FilePath>
+            </File>
+          </Files>
+        </Group>
+        <Group>
+          <GroupName>myApplication_navigation</GroupName>
+          <Files>
+            <File>
+              <FileName>app_pose.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\libraries\myApplication\navigation\app_pose.c</FilePath>
+            </File>
+            <File>
+              <FileName>app_pose.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\..\libraries\myApplication\navigation\app_pose.h</FilePath>
             </File>
           </Files>
         </Group>

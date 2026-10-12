@@ -14,6 +14,7 @@ void receive_task(void *pvParameters);
 uint8_t receive_data_init(void);
 uint8_t receive_imu_snapshot(app_imu_sample_t *sample);
 uint8_t receive_attitude_snapshot(app_attitude_t *attitude);
+uint8_t receive_encoder_snapshot(app_encoder_sample_t *encoder);
 uint8_t receive_display_snapshot(app_attitude_t *attitude,
                                  app_encoder_sample_t *encoder);
 void receive_publish_attitude(const app_attitude_t *attitude);

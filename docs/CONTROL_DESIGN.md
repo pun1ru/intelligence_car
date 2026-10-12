@@ -19,16 +19,16 @@
 | `app_balance_step` 速度外环 | 20 ms | 目标/平均线速度 m/s | 目标倾角 |
 | `app_balance_step` 角度内环 | 5 ms | 目标倾角、姿态、角速度 | 左右有符号 PWM |
 
-直立 pitch 安全基准为 `-90 deg`，当前角度目标为 `-92 deg`。C14 起立或串口进入平衡/导航要求相对安全基准误差不超过 `10 deg`；运行中误差超过 `45 deg`，或姿态无效/过期，立即清零电机 PWM 并锁存保护，只能再次请求起立。`control_task` 每 5 ms 调用 `app_balance_step`；速度 PI 每 20 ms 根据左右轮平均线速度修正目标倾角，角度 PD 每 5 ms 以校准后的 X 轴陀螺仪角速度作为阻尼反馈。正轮速偏大时，`BALANCE_SPEED_TO_TILT_SIGN=+1` 使目标 pitch 减小，让车体先向后倾，再通过姿态环减速；形成后倾时轮子可能短暂向前推。两电机收到相同的有符号 PWM，角度环输出暂限幅 `±3000/10000`。按钮和导航模式目标速度为零；串口平衡模式采用收到的目标线速度。角度环极性与轮速测试的 `WHEEL_SPEED_PWM_POLARITY` 独立，实车增益仍需调试。
+直立 pitch 安全基准为 `-90 deg`，当前角度目标为 `-92 deg`。C14 起立或串口进入平衡/导航要求相对安全基准误差不超过 `10 deg`；运行中误差超过 `45 deg`，或姿态无效/过期，立即清零电机 PWM 并锁存保护，只能再次请求起立。`control_task` 每 5 ms 调用 `app_balance_step`；速度 PI 每 20 ms 根据左右轮平均线速度修正目标倾角，角度 PD 每 5 ms 以校准后的 X 轴陀螺仪角速度作为阻尼反馈。正轮速偏大时，`BALANCE_SPEED_TO_TILT_SIGN=+1` 使目标 pitch 减小，让车体先向后倾，再通过姿态环减速；形成后倾时轮子可能短暂向前推。两电机收到相同的有符号 PWM，角度环输出限幅 `±3500/10000`，转向环 PID 输出另限幅 `±1000` 后叠加前馈，再按 `±3500` 限幅。按钮和导航模式目标速度为零；串口平衡模式采用收到的目标线速度。角度环极性与轮速测试的 `WHEEL_SPEED_PWM_POLARITY` 独立，实车增益仍需调试。
 
 当前使用 Madgwick 四元数姿态估计，应用层 `pitch` 对应算法输出的 X 轴欧拉角，范围 `[-180 deg, 180 deg]`。`-90 deg` 并非该角度的回绕边界；若静止时仍跳到 `±180 deg`，需同时检查原始陀螺仪、加速度、四元数和其他欧拉角。屏幕显示 `Gx dps`，便于观察角度跳变时 X 轴陀螺仪是否也出现大角速度。角度环遇到这种输出会触发上述跌倒保护，不会继续驱动电机。
 
 ## 临时电机测试与状态
 
-C26/C27 双开时进入校准模式；C12 采样校准，C13 重置当前姿态滤波器。轮速测试由控制任务每 10 ms 调用 `app_control_step`：按住 C15 测左轮、按住 C14 测右轮，有符号正 PWM 经 `WHEEL_*_PWM_FORWARD_LEVEL=0` 将对应 DIR 设为低电平。控制器根据独立读取的增量编码器计数和轮系尺寸，按轮速绝对值闭环跟踪 `MOTOR_TEST_TARGET_SPEED_MPS=1.0 m/s`；PWM 上限为 `MOTOR_TEST_MAX_PWM_DUTY=5000/10000`。轮速 P 增益为 `4000`。松开对应按键或退出双开模式，该轮立即归零并重置 PID。C26/C27 只开一个时同样输出零 PWM。
+C26/C27 双开时进入校准模式；C12 采样校准，C13 重置当前姿态滤波器。轮速测试由控制任务每 10 ms 调用 `app_control_step`：按住 C15 测左轮、按住 C14 测右轮，有符号正 PWM 经 `WHEEL_*_PWM_FORWARD_LEVEL=0` 将对应 DIR 设为低电平。控制器根据独立读取的增量编码器计数和轮系尺寸，按轮速绝对值闭环跟踪 `MOTOR_TEST_TARGET_SPEED_MPS=1.0 m/s`；PWM 上限为 `MOTOR_TEST_MAX_PWM_DUTY=5000/10000`，轮速环增益为 `WHEEL_SPEED_KP=5000`、`KD=100`。松开对应按键或退出双开模式，该轮立即归零并重置 PID。C26/C27 只开一个时同样输出零 PWM。
 
-正常模式中 C14 申请平衡、C13 申请导航、C15 保护；串口可请求相同状态并保存速度、yaw 目标，500 ms 无合法帧后锁存保护。导航暂不执行路径动作。姿态算法依据实际 IMU 样本间隔积分；显示 roll 的符号已按 `+X` 观察方向修正。
-The steering defaults are `Kp=100`, `Ki=2`, `Kd=0`, with a separate angle
+正常模式中 C14 申请平衡、C13 申请导航、C15 保护；串口可请求相同状态并保存速度、yaw 目标，500 ms 无合法帧后锁存保护。导航目前只维护位姿估计，不执行路径动作：`decision_task` 每 10 ms 按 `myAlgorithm/odometry` 积分编码器里程与 yaw，进入导航时以当前位置和航向为原点，详见 [车体约定](VEHICLE_CONVENTIONS.md)。姿态算法依据实际 IMU 样本间隔积分；显示 roll 的符号已按 `+X` 观察方向修正。
+The steering defaults are `Kp=30`, `Ki=2`, `Kd=0`, with a separate angle
 feedforward default of `10 PWM/deg`. The steering feedforward is the shortest
 Yaw error multiplied by this gain. The control loop wraps
 the target minus measured Yaw into `[-180, 180]`, so crossing the angle
@@ -36,7 +36,13 @@ boundary always follows the shorter turn. Encoder speed anomalies are exposed
 as a telemetry diagnostic (`valid bit5`) after 100 ms and clear after 200 ms;
 the flag does not independently enter protection.
 
+The steering PID output is limited to `BALANCE_STEERING_PWM_LIMIT = 1000`
+before the feedforward term is added; the sum is then clamped together with the
+angle loop output to `BALANCE_ANGLE_PWM_LIMIT = 3500`. A large Yaw error is
+therefore dominated by the feedforward term rather than by the proportional
+gain.
+
 Support mode forces the steering loop off and clears its integral. When Support
 returns to Balance, the state task seeds the target Yaw from the current measured
-Yaw. The speed loop default Kp is `16`; its pitch target limit is asymmetric:
+Yaw. The speed loop default Kp is `24`; its pitch target limit is asymmetric:
 `+15 deg` forward and `-5 deg` backward, while the angle PWM limit is `3500`.

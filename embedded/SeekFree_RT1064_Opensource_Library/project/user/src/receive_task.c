@@ -84,6 +84,15 @@ uint8_t receive_attitude_snapshot(app_attitude_t *attitude)
             pdMS_TO_TICKS(VEHICLE_ATTITUDE_TIMEOUT_MS)) ? 1U : 0U;
 }
 
+uint8_t receive_encoder_snapshot(app_encoder_sample_t *encoder)
+{
+    if ((encoder == NULL) || (encoder_queue == NULL))
+    {
+        return 0U;
+    }
+    return (xQueuePeek(encoder_queue, encoder, 0U) == pdTRUE) ? 1U : 0U;
+}
+
 void receive_publish_attitude(const app_attitude_t *attitude)
 {
     if ((attitude != NULL) && (attitude_queue != NULL))

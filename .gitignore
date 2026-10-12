@@ -12,3 +12,7 @@ embedded/SeekFree_RT1064_Opensource_Library/project/mdk/Listings/
 embedded/SeekFree_RT1064_Opensource_Library/project/mdk/*.log
 embedded/SeekFree_RT1064_Opensource_Library/project/mdk/*.uvguix.*
 embedded/SeekFree_RT1064_Opensource_Library/project/mdk/*.uvoptx
+
+# Host algorithm test binaries
+tests/host/*.exe
+tests/host/*.o

@@ -17,7 +17,8 @@ embedded/SeekFree_RT1064_Opensource_Library/
     │   ├── motion/              轮电机控制流程
     │   ├── interaction/         蜂鸣器和屏幕显示
     │   ├── state/               车辆状态机
-    │   └── communication/       串口通信
+    │   ├── communication/       串口通信
+    │   └── navigation/          导航：位姿估计、路径与轨迹跟踪
     ├── myDriver/                自有驱动层：板级设备与逐飞接口适配
     ├── zf_common/               逐飞公共库
     ├── zf_driver/               逐飞芯片外设驱动
@@ -75,8 +76,8 @@ Task ──使用──> FreeRTOS（调度与通信）
 
 当前板级外设访问集中在 `myDriver`。`myApplication` 的系统、传感器、运动、交互外设、通信和状态目录均已有实现。屏幕输出由 `interaction/app_display` 管理，串口帧由 `communication/app_serial` 管理。`receive_task` 用长度为 1 的 FreeRTOS 队列发布 IMU、编码器和姿态快照；`estimate_task` 由信号量唤醒。任务运行统计独立放在 `project/user/src/task_metrics.c`。Kalman 算法通过调用方提供的分配器获取内存，算法头文件不再包含 FreeRTOS。
 
-`state_task` 按周期读取按键、拨码、姿态及串口命令，调用 `app_state` 更新状态，并通过单元素队列发布状态快照；`estimate_task` 负责 Madgwick 姿态计算、校准与滤波器重置。`decision_task` 仍为空任务框架。`control_task` 每 5 ms 读取状态和姿态并调用 Application 控制入口：平衡/导航状态运行 20 ms 速度外环和 5 ms pitch 角度内环，当前零速角度基准为 `-92 deg`；转向环同样以 5 ms 周期运行，输出左右轮差速，速度目标为 0 时两轮反向绕车体中心旋转；C26/C27 双开校准模式下，每 10 ms 执行 C15 左轮、C14 右轮的 1 m/s 轮速闭环测试。控制任务发现姿态无效或偏离直立安全基准 `-90 deg` 超过 `45 deg` 时，当周期清零 PWM 并通知状态任务锁存保护。控制、IMU 接收和姿态解算任务优先级高于 TFT 显示任务。
+`state_task` 按周期读取按键、拨码、姿态及串口命令，调用 `app_state` 更新状态，并通过单元素队列发布状态快照；`estimate_task` 负责 Madgwick 姿态计算、校准与滤波器重置。`decision_task` 每 10 ms 读取状态、姿态和编码器快照，调用 `app_pose` 维护导航位姿：进入导航状态时以当前位置和航向作为原点，运行中按编码器里程与 yaw 积分更新 `x`、`y`、`heading`；离开导航后位姿失效，路径表与轨迹跟踪尚未实现。`control_task` 每 5 ms 读取状态和姿态并调用 Application 控制入口：平衡/导航状态运行 20 ms 速度外环和 5 ms pitch 角度内环，当前零速角度基准为 `-92 deg`；转向环同样以 5 ms 周期运行，输出左右轮差速，速度目标为 0 时两轮反向绕车体中心旋转；C26/C27 双开校准模式下，每 10 ms 执行 C15 左轮、C14 右轮的 1 m/s 轮速闭环测试。控制任务发现姿态无效或偏离直立安全基准 `-90 deg` 超过 `45 deg` 时，当周期清零 PWM 并通知状态任务锁存保护。控制、IMU 接收和姿态解算任务优先级高于 TFT 显示任务。
 
-校准在 `estimate_task` 中按样本非阻塞执行，结果仅在 RAM 中保存；`receive_task` 持续发布 IMU 和编码器快照。姿态估计按实际样本 tick 间隔积分，屏幕按相邻编码器绝对计数差分计算轮速。车体坐标、轮系正方向、引脚和拨码操作见 [车体约定](VEHICLE_CONVENTIONS.md)，上位机帧草案见 [串口协议](SERIAL_PROTOCOL.md)。
+校准在 `estimate_task` 中按样本非阻塞执行，结果仅在 RAM 中保存；`receive_task` 持续发布 IMU、编码器和姿态快照，并提供对应的只读快照接口。姿态估计按实际样本 tick 间隔积分，屏幕按相邻编码器绝对计数差分计算轮速。导航位姿由 `decision_task` 以 10 ms 周期按编码器增量与 yaw 积分维护，轮距取 `WHEEL_TRACK_M`。车体坐标、轮系正方向、位姿约定、引脚和拨码操作见 [车体约定](VEHICLE_CONVENTIONS.md)，上位机帧草案见 [串口协议](SERIAL_PROTOCOL.md)。
 
 新增模块评审时检查：文件是否位于所属层、头文件是否泄漏上层/第三方类型、依赖图是否有环、任务是否仅处理调度与通信、异常时执行器是否进入安全状态。

@@ -53,5 +53,5 @@ Telemetry `valid` bit `0x20` reports the vehicle-side encoder speed anomaly or l
 Command `05` sets the wheel speed feedforward gain in `PWM/(m/s)` and enters
 protection. Command `08` sets the steering feedforward gain in `PWM/deg` and
 also enters protection. The steering feedforward default is `10 PWM/deg`; the
-steering PID defaults are `Kp=100`, `Ki=2`, `Kd=0`. The upper panel exposes
+steering PID defaults are `Kp=30`, `Ki=2`, `Kd=0`. The upper panel exposes
 both gains independently.

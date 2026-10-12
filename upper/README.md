@@ -12,7 +12,7 @@ with a scale bar. Vehicle state shows the encoder based lift diagnostic.
 Keyboard mode sends configurable W/S speed and continuously changes the A/D
 yaw target while the key is held; the yaw rate is configured in degrees per
 second and the vehicle controller follows the shortest angular error.
-The steering loop uses the lower default gains (`Kp=100`, `Ki=2`) plus an
+The steering loop uses the lower default gains (`Kp=30`, `Ki=2`) plus an
 angle based feedforward gain in `PWM/deg`, configurable from the PID panel.
 The wheel speed loop has a speed error feedforward gain in `PWM/(m/s)` in the
 same panel. While the vehicle side reports the lift diagnostic bit, the trajectory
@@ -21,7 +21,7 @@ create drift.
 
 Support mode disables steering control and clears its steering integral. On the
 return to Balance, the current measured Yaw becomes the new target to avoid a
-differential output step. The speed loop uses `Kp=16` with a `+15/-5 degree`
+differential output step. The speed loop uses `Kp=24` with a `+15/-5 degree`
 forward/backward pitch limit.
 
 The realtime chart tab places the current values for the selected curves beside
