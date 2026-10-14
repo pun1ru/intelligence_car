@@ -40,7 +40,7 @@ DRAW_PERIOD_S = 0.2
 TIMEOUT_NOTICE = "Telemetry timeout; protection requested."
 # 显示在窗口标题里。桌面上存在多份仓库副本，靠这个标记一眼看出窗口跑的是哪份
 # 代码：标题里没有这个标记，就说明打开的是旧副本或改动前的旧进程。
-UI_VERSION = "v7-pose"
+UI_VERSION = "v8-pose"
 MODES = ("Button", "Serial", "Calibration")
 STATES = ("Protect", "Balance", "Navigation", "Support")
 CHARTS = (
@@ -216,8 +216,12 @@ class Console(tk.Tk):
                         variable=self.steering_enabled,
                         command=self.toggle_steering).grid(row=2, column=0, columnspan=2,
                                                            sticky="w", pady=(4, 0))
-        ttk.Button(control, text="Calibrate gyro bias",
-                   command=self.start_calibration).grid(row=2, column=4, padx=5, pady=(4, 0))
+        # 放在第 6 列：第 2 行第 2~5 列被下面那句说明文字占着，之前按钮摆在第 4 列
+        # 与它重叠，被后创建的 label 盖住，界面上根本看不到（见 LOG 2026-10-14）。
+        ttk.Button(control, text="Calibrate gyro bias (20 s still)",
+                   command=self.start_calibration).grid(row=2, column=6,
+                                                        sticky="w", padx=5,
+                                                        pady=(4, 0))
         ttk.Label(control, text="Yaw uses shortest-angle error and differential wheels.").grid(
             row=2, column=2, columnspan=4, sticky="w", pady=(4, 0))
 

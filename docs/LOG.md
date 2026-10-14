@@ -86,3 +86,11 @@
 - 验证：上位机（`[v7-pose]`）连接后静置 **7 分钟**，全程 online，`lost 0 / bad 0`。
 - 过程中排除的三个假象：`lost` 计数误报（三种帧共用序号却只对遥测帧计数，已修）；车"没反应 + 白屏"（调试器 DAP 未拔，内核被停住，与固件无关）；屏幕白屏（同上，插好屏幕并重新上电即可）。
 - 未解决：陀螺零偏 0.78°/s 漂移待校准（上位机 "Calibrate gyro bias" 或拨码 + C12，20 秒静置）；位姿标定（推 0.92 m 看读数）与路径跟踪待做。
+
+## 2026-10-14（修界面上被遮盖的按钮）
+
+- 问题：界面上找不到陀螺零偏校准按钮。原因不是按钮不存在，而是摆放重叠：`Calibrate gyro bias` 放在 `Motion control` 框的 row2/col4，而说明文字 `Yaw uses shortest-angle error and differential wheels.` 占 row2 的 col2~col5 且后创建，把它整个盖住了。
+- 变更：按钮移到 row2/col6 并改名为 `Calibrate gyro bias (20 s still)`（顺带说明需要静置 20 秒）；`upper/README.md` 补上按钮位置、操作方法与"不依赖链路也可用拨码 + C12"的说明。
+- 变更：写了一个控件重叠检查脚本（按 grid 的 row/column/span 求交集），确认修好后全界面无重叠。
+- 验证：重叠检查输出 `remaining overlaps: 0`，按钮 `VISIBLE`（x=658, y=352）；`py_compile` 通过。UI_VERSION 升到 v8-pose 以便确认已重启。
+- 未解决：陀螺零偏校准本身仍待实测；位姿标定与路径跟踪待做。

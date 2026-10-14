@@ -37,3 +37,10 @@ readouts show the vehicle's own numbers and sit in the `Vehicle state` box at
 the top of the window. The pose frame arrives at 2 Hz, so those readouts update
 twice per second; the fixed telemetry frame still arrives at 10 Hz. See
 `docs/SERIAL_PROTOCOL.md` for the frame layout.
+
+The gyro bias calibration is started from `Calibrate gyro bias (20 s still)` in
+the `Motion control` box: place the vehicle flat, press it, then keep the vehicle
+still for 20 seconds without touching C14/C15. The measured bias appears in the
+`Bias X/Y/Z` readouts; the result is discarded if the vehicle moves during the
+sample window. The whole sequence also works without the wireless link, using the
+two mode switches plus C12 (see `docs/VEHICLE_CONVENTIONS.md`).
