@@ -34,4 +34,6 @@ vehicle reports in frame type `0x82` (orange). The two overlap while the
 vehicle-side estimator is healthy, and diverging curves point at wheel slip, a
 scale error or yaw drift. The `Vehicle pose (x, y)` and `Vehicle path length`
 readouts show the vehicle's own numbers and sit in the `Vehicle state` box at
-the top of the window; see `docs/SERIAL_PROTOCOL.md` for the frame layout.
+the top of the window. The pose frame arrives at 2 Hz, so those readouts update
+twice per second; the fixed telemetry frame still arrives at 10 Hz. See
+`docs/SERIAL_PROTOCOL.md` for the frame layout.

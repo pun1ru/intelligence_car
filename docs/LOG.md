@@ -69,3 +69,11 @@
 - 变更：上位机新增 `Frame period now/max (ms)` 读数与 `SequenceTracker` 丢帧统计（后者修掉"三种帧共用序号却只对遥测帧计数"导致的误报）。
 - 验证：Keil 全量编译 `0 Error(s), 0 Warning(s)`，`Code=103696`（此前 103624）。尚未烧录复测，无线链路需实机确认 `lost`/`bad` 是否停止增长。
 - 未解决：若错开后仍丢帧，说明模块的持续吞吐不足，下一步降低位姿帧频率（如 300~500 ms）或台架改用 USB-TTL 有线直连。
+
+## 2026-10-14（降频 + 屏幕显示位姿）
+
+- 现象：错开发送烧录后，上位机仍持续 timeout，`lost`/`bad` 继续增长，说明瓶颈不是突发缓冲而是模块的**持续吞吐**：需求 940 B/s，实际稳定吞吐约 700 B/s。
+- 变更：位姿帧与校准帧降为 2 Hz（每 500 ms 一帧，`SEND_SLOW_PERIOD_MS`），遥测帧保持 100 ms；三帧仍落在不同 20 ms 时隙上。总流量由 940 B/s 降到约 604 B/s。降频只影响调试观察，控制环用的位姿仍在车端以 10 ms 更新，不受影响。
+- 变更：TFT 最后一行（y=144）显示导航位姿 `X:`/`Y:`，取不到位姿时显示 `--`。`drv_io_display_pose` / `drv_io_display_pose_invalid` 加在 `myDriver`，由 `app_display_update` 新增的 `pose` 参数驱动，`debug_task` 通过 `decision_task_get_pose` 取快照。这样台架标定（推车看里程）不再依赖无线链路。
+- 验证：Keil 全量编译 `0 Error(s), 0 Warning(s)`，`Code=103936`（此前 103696）。文档同步 `SERIAL_PROTOCOL.md`、`upper/README.md`。
+- 未解决：无线链路需实机复测；若仍丢帧，建议台架改用 USB-TTL 有线直连（接法：车 TX D16 → 适配器 RX，车 RX D17 → 适配器 TX，共地，适配器 3.3V 档，同时断开无线模块）。陀螺零偏 0.78°/s 的漂移仍待校准（可用拨码 + C12，全程不需要链路）。

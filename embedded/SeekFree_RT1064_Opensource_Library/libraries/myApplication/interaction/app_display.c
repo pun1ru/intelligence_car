@@ -13,7 +13,8 @@ void app_display_init(void)
 }
 
 void app_display_update(const app_attitude_t *attitude,
-                        const app_encoder_sample_t *encoder, float dt_s)
+                        const app_encoder_sample_t *encoder, float dt_s,
+                        const app_pose_t *pose)
 {
     app_encoder_motion_t motion;
 
@@ -30,5 +31,14 @@ void app_display_update(const app_attitude_t *attitude,
                               motion.left.speed_m_s,
                               motion.right.angular_speed_rad_s,
                               motion.right.speed_m_s);
+    }
+    /* 位姿一行独立于轮速：没定原点时显示 "--"，避免把 0.00 当成真实读数 */
+    if ((pose != NULL) && (pose->valid != 0U))
+    {
+        drv_io_display_pose(pose->x_m, pose->y_m);
+    }
+    else
+    {
+        drv_io_display_pose_invalid();
     }
 }

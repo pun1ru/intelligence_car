@@ -74,7 +74,7 @@ Task ──使用──> FreeRTOS（调度与通信）
 
 ## 5. 当前实现与后续检查
 
-当前板级外设访问集中在 `myDriver`。`myApplication` 的系统、传感器、运动、交互外设、通信和状态目录均已有实现。屏幕输出由 `interaction/app_display` 管理，串口帧由 `communication/app_serial` 管理。`receive_task` 用长度为 1 的 FreeRTOS 队列发布 IMU、编码器和姿态快照；`estimate_task` 由信号量唤醒。任务运行统计独立放在 `project/user/src/task_metrics.c`。Kalman 算法通过调用方提供的分配器获取内存，算法头文件不再包含 FreeRTOS。
+当前板级外设访问集中在 `myDriver`。`myApplication` 的系统、传感器、运动、交互外设、通信和状态目录均已有实现。屏幕输出由 `interaction/app_display` 管理（最后一行显示导航位姿 `X:`、`Y:`，取不到位姿时显示 `--`，便于不接上位机做台架标定），串口帧由 `communication/app_serial` 管理。`receive_task` 用长度为 1 的 FreeRTOS 队列发布 IMU、编码器和姿态快照；`estimate_task` 由信号量唤醒。任务运行统计独立放在 `project/user/src/task_metrics.c`。Kalman 算法通过调用方提供的分配器获取内存，算法头文件不再包含 FreeRTOS。
 
 `state_task` 按周期读取按键、拨码、姿态及串口命令，调用 `app_state` 更新状态，并通过单元素队列发布状态快照；`estimate_task` 负责 Madgwick 姿态计算、校准与滤波器重置。`decision_task` 每 10 ms 读取状态、姿态和编码器快照，调用 `app_pose` 维护位姿：上电后第一个有效姿态样本确定原点，之后按编码器里程与 yaw 积分更新 `x`、`y`、`heading`，进入导航状态时重新确定原点、退出校准时重置原点，位姿经单元素队列发布供遥测与后续路径跟踪使用。路径表与轨迹跟踪尚未实现。`control_task` 每 5 ms 读取状态和姿态并调用 Application 控制入口：平衡/导航状态运行 20 ms 速度外环和 5 ms pitch 角度内环，当前零速角度基准为 `-92 deg`；转向环同样以 5 ms 周期运行，输出左右轮差速，速度目标为 0 时两轮反向绕车体中心旋转；C26/C27 双开校准模式下，每 10 ms 执行 C15 左轮、C14 右轮的 1 m/s 轮速闭环测试。控制任务发现姿态无效或偏离直立安全基准 `-90 deg` 超过 `45 deg` 时，当周期清零 PWM 并通知状态任务锁存保护。控制、IMU 接收和姿态解算任务优先级高于 TFT 显示任务。
 

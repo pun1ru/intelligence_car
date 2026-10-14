@@ -109,10 +109,16 @@ void drv_io_display_init(void)
     tft180_show_string(0, 96, "R rad/s:");
     tft180_show_string(0, 112, "R m/s:");
     tft180_show_string(0, 128, "Gx dps:");
+    /* 最后一行留给导航位姿：台架推车标定时不用开上位机（无线链路不稳也能测）。
+     * 屏宽 128 px、字体 8 px，"标签 + 最多 6 字符数字"刚好摆得下两组。 */
+    tft180_show_string(0, 144, "X:");
+    tft180_show_string(64, 144, "Y:");
     tft180_show_string(64, 64, "--");
     tft180_show_string(64, 80, "--");
     tft180_show_string(64, 96, "--");
     tft180_show_string(64, 112, "--");
+    tft180_show_string(16, 144, "--");
+    tft180_show_string(80, 144, "--");
 }
 
 void drv_io_display_angles(float roll, float pitch, float yaw,
@@ -131,6 +137,18 @@ void drv_io_display_wheels(float left_omega_rad_s, float left_speed_m_s,
     tft180_show_float(64, 80, left_speed_m_s, 3, 3);
     tft180_show_float(64, 96, right_omega_rad_s, 3, 2);
     tft180_show_float(64, 112, right_speed_m_s, 3, 3);
+}
+
+void drv_io_display_pose(float x_m, float y_m)
+{
+    tft180_show_float(16, 144, x_m, 2, 2);
+    tft180_show_float(80, 144, y_m, 2, 2);
+}
+
+void drv_io_display_pose_invalid(void)
+{
+    tft180_show_string(16, 144, "--");
+    tft180_show_string(80, 144, "--");
 }
 
 void drv_io_buzzer_init(void)

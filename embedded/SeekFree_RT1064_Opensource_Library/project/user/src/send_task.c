@@ -12,37 +12,40 @@
 #include "task_metrics.h"
 
 /*
- * send_task：把三帧数据发给上位机，一轮 SEND_TELEMETRY_PERIOD_MS（100 ms）：
- *   时隙 0：52 字节车辆遥测帧（0x80）——状态、姿态、IMU、轮速、PWM、目标值；
- *   时隙 1：18 字节导航位姿帧（0x82）——位姿，仅用于调试观察；
- *   时隙 2：24 字节校准帧（0x81）——陀螺零偏采样进度与结果。
- * 三帧错开成三个时隙（每 20 ms 一个）而不是连发：实测无线模块缓冲装不下
- * 94 字节的连发，会整帧丢弃靠后的校准帧和位姿帧，而错开后一次最多 52 字节。
- * 帧率不变，只是把原本挤在一起的发送摊开。
+ * send_task：把三帧数据发给上位机。以 SEND_TASK_PERIOD_MS（20 ms）为一个时隙：
+ *   每 5 个时隙（100 ms）：52 字节车辆遥测帧（0x80）——状态、姿态、IMU、轮速、PWM；
+ *   每 25 个时隙（500 ms）：18 字节导航位姿帧（0x82）——位姿，仅用于调试观察；
+ *   每 25 个时隙（500 ms）：24 字节校准帧（0x81）——陀螺零偏采样进度与结果。
+ *
+ * 两点都是为了迁就无线模块实测吞吐（约 700 B/s，低于遥测+位姿+校准连发的
+ * 940 B/s）：
+ *   1. 一帧一个时隙、帧间留 20 ms，模块不用一次缓冲 94 字节；
+ *   2. 位姿与校准这类"看得清就行"的数据降到 2 Hz，总流量降到约 604 B/s。
+ * 遥测帧保持 100 ms 不变，因为它承载姿态与轮速，降频会直接影响看图。
  * 每帧只填自己有效的数据，并在 valid 位里标明，上位机据此决定是否显示 "--"。
  * 这里只负责"取谁的数据"，具体帧格式在 communication/app_serial。
  */
 
-#if (SEND_TELEMETRY_PERIOD_MS % SEND_TASK_PERIOD_MS) != 0U
-#error Send slot period must divide the frame period.
+#if ((SEND_TELEMETRY_PERIOD_MS % SEND_TASK_PERIOD_MS) != 0U) || \
+    ((SEND_SLOW_PERIOD_MS % SEND_TELEMETRY_PERIOD_MS) != 0U)
+#error Send periods must be multiples: slot <= telemetry <= slow.
 #endif
 
-#define SEND_TELEMETRY_SLOT 0U
-#define SEND_POSE_SLOT      1U
-#define SEND_CALIBRATION_SLOT 2U
-#define SEND_SLOT_COUNT (SEND_TELEMETRY_PERIOD_MS / SEND_TASK_PERIOD_MS)
+#define SEND_TELEMETRY_TICKS (SEND_TELEMETRY_PERIOD_MS / SEND_TASK_PERIOD_MS)
+#define SEND_SLOW_TICKS      (SEND_SLOW_PERIOD_MS / SEND_TASK_PERIOD_MS)
 
 void send_task(void *pvParameters)
 {
     TickType_t last_wake_tick = xTaskGetTickCount();
-    uint8_t slot = SEND_TELEMETRY_SLOT;
+    /* 时隙计数，用来把三帧摊到不同时隙上（见文件头的说明） */
+    uint32_t tick = 0U;
 
     (void)pvParameters;
     for (;;)
     {
         uint32_t metric_start = task_metrics_begin();
 
-        if (slot == SEND_TELEMETRY_SLOT)
+        if ((tick % SEND_TELEMETRY_TICKS) == 0U)
         {
             app_serial_telemetry_t telemetry = {0};
             app_state_t state;
@@ -101,7 +104,7 @@ void send_task(void *pvParameters)
             }
             app_serial_send(&telemetry);
         }
-        else if (slot == SEND_POSE_SLOT)
+        else if ((tick % SEND_SLOW_TICKS) == 1U)
         {
             app_serial_pose_t pose_telemetry = {0};
             app_state_t state;
@@ -130,7 +133,7 @@ void send_task(void *pvParameters)
             }
             app_serial_send_pose(&pose_telemetry);
         }
-        else if (slot == SEND_CALIBRATION_SLOT)
+        else if ((tick % SEND_SLOW_TICKS) == 3U)
         {
             app_gyro_calibration_result_t gyro_calibration;
             app_serial_calibration_t calibration_telemetry;
@@ -153,7 +156,7 @@ void send_task(void *pvParameters)
             /* 空时隙：留给模块把上一帧送出去 */
         }
 
-        slot = (uint8_t)((slot + 1U) % SEND_SLOT_COUNT);
+        tick++;
         task_metrics_end(TASK_METRIC_SEND, metric_start);
         vTaskDelayUntil(&last_wake_tick, pdMS_TO_TICKS(SEND_TASK_PERIOD_MS));
     }
