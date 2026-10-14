@@ -35,6 +35,8 @@ HEARTBEAT_MS = 100
 KEYBOARD_PERIOD_MS = 100
 STALE_S = 0.5
 HISTORY_LENGTH = 600
+# 画图限流：5 Hz 足够看曲线，又能让 poll() 及时读串口（见 display()）
+DRAW_PERIOD_S = 0.2
 TIMEOUT_NOTICE = "Telemetry timeout; protection requested."
 # 显示在窗口标题里。桌面上存在多份仓库副本，靠这个标记一眼看出窗口跑的是哪份
 # 代码：标题里没有这个标记，就说明打开的是旧副本或改动前的旧进程。
@@ -76,6 +78,7 @@ class Console(tk.Tk):
         # 间隔变大但 lost 不涨 = 车端没按时发；lost 跟着涨 = 链路丢帧。
         self.periods: deque[float] = deque(maxlen=50)
         self.last_telemetry_at = 0.0
+        self.last_draw_at = 0.0
         # 底部的提示行以前只在超时事件里写一次，恢复后仍留着旧文字，
         # 容易让人以为"现在还在超时"，所以改成跟着状态切换。
         self.timeout_notice_shown = False
@@ -659,8 +662,14 @@ class Console(tk.Tk):
             "yaw": frame.yaw_deg if attitude_valid else None,
         })
         self._update_trajectory(frame)
-        self._draw_chart()
-        self._draw_trajectory()
+        # 画图很贵：整页重画 + tight_layout 每次要几十到上百毫秒。原来每收到一帧
+        # 遥测（10 Hz）就重画两张图，历史攒到上限（600 点 = 60 秒）后开销最大，
+        # 会把 Tk 事件循环占满，poll() 读串口的间隔被拖到几百毫秒——表现出来就是
+        # 帧间隔忽大忽小、最后连接超时。所以限流到 5 Hz 就够看了。
+        if (now - self.last_draw_at) >= DRAW_PERIOD_S:
+            self.last_draw_at = now
+            self._draw_chart()
+            self._draw_trajectory()
 
     def _update_trajectory(self, frame: Telemetry) -> None:
         if frame.valid & VALID_LIFT:
@@ -707,7 +716,7 @@ class Console(tk.Tk):
         self.metrics["pose_yaw_rate"].set(
             f"{frame.yaw_rate_rad_s * DEG_PER_RAD:.1f}")
         self.vehicle_pose_points.append((frame.x_m, frame.y_m))
-        self._draw_trajectory()
+        # 不在这里单独重画：下一次 display() 的限流重画会带上它，避免额外开销
 
     def reset_history(self) -> None:
         self.samples.clear()
