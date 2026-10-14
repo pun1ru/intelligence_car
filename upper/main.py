@@ -85,6 +85,8 @@ class Console(tk.Tk):
         self.latest_frame: Telemetry | None = None
         # 车端 0x82 帧报来的位姿，仅用于和主机端推算做对比
         self.latest_pose: NavPoseTelemetry | None = None
+        # 轨迹页顶部的路径跟踪读数（车端算出的目标速度/航向/横向偏差）
+        self.nav_text = tk.StringVar(value="Nav: off")
 
         self.status = tk.StringVar(value="Disconnected")
         self.port_name = tk.StringVar()
@@ -340,6 +342,9 @@ class Console(tk.Tk):
             ttk.Label(trajectory_controls,
                       text="Body frame: +X forward, +Y left; origin and heading are set on reset.").pack(
                           side="left", padx=10)
+            # 路径跟踪指令就放在轨迹页顶部：它和图上的位姿曲线是同一件事的两面
+            ttk.Label(trajectory_controls, textvariable=self.nav_text,
+                      font=("Consolas", 10)).pack(side="left", padx=10)
             self.trajectory_figure = Figure(figsize=(8, 4.4), dpi=100)
             self.trajectory_axis = self.trajectory_figure.add_subplot(111)
             self.trajectory_canvas = FigureCanvasTkAgg(
@@ -713,12 +718,21 @@ class Console(tk.Tk):
             self.metrics["pose"].set("--")
             self.metrics["pose_path"].set("--")
             self.metrics["pose_yaw_rate"].set("--")
+            self.nav_text.set("Nav: off")
             return
         self.metrics["pose"].set(f"{frame.x_m:.2f}, {frame.y_m:.2f}")
         self.metrics["pose_path"].set(f"{frame.path_length_m:.2f}")
         # 帧里是 rad/s，这里换成 deg/s 方便和 Yaw 那一栏的变化速度直接对比
         self.metrics["pose_yaw_rate"].set(
             f"{frame.yaw_rate_rad_s * DEG_PER_RAD:.1f}")
+        if frame.nav_active:
+            self.nav_text.set(
+                f"Nav: on  v={frame.nav_target_speed_m_s:.2f} m/s  "
+                f"yaw={frame.nav_target_yaw_deg:+.1f} deg  "
+                f"cross={frame.nav_cross_track_m:+.2f} m  "
+                f"pt={frame.nav_target_index}")
+        else:
+            self.nav_text.set("Nav: off")
         self.vehicle_pose_points.append((frame.x_m, frame.y_m))
         # 不在这里单独重画：下一次 display() 的限流重画会带上它，避免额外开销
 

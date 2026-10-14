@@ -376,6 +376,14 @@ uint8_t app_serial_encode_pose(const app_serial_pose_t *pose, uint8_t sequence,
                SERIAL_POSE_POSITION_UNITS_PER_M);
     put_scaled(frame, 14U, pose->yaw_rate_rad_s,
                SERIAL_POSE_RATE_UNITS_PER_RAD_S);
+    /* 导航指令（25 字节版新增），valid 的 bit2 为 1 时才代表有效 */
+    put_scaled(frame, 16U, pose->nav_target_speed_m_s,
+               SERIAL_POSE_NAV_SPEED_UNITS_PER_MPS);
+    put_scaled(frame, 18U, pose->nav_target_yaw_deg,
+               SERIAL_ANGLE_UNITS_PER_DEG);
+    put_scaled(frame, 20U, pose->nav_cross_track_m,
+               SERIAL_POSE_NAV_OFFSET_UNITS_PER_M);
+    frame[22] = pose->nav_target_index;
     put_crc(frame, SERIAL_NAV_POSE_LENGTH);
     return 1U;
 }

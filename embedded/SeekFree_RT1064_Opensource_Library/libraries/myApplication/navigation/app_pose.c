@@ -58,6 +58,7 @@ void app_pose_set_origin(app_pose_state_t *state, float yaw_deg)
     state->pose = (app_pose_t){0};
     /* 只有真正定上了原点，才把位姿标为可信 */
     state->pose.valid = state->odometry.origin_set;
+    state->pose.yaw_offset_deg = yaw_deg;
 }
 
 uint8_t app_pose_step(app_pose_state_t *state,

@@ -23,6 +23,9 @@ typedef struct
     float heading_deg;     /* 相对原点航向偏角，[-180, 180]，左转为正 */
     float path_length_m;   /* 自原点起的带符号累计行程，m */
     float yaw_rate_rad_s;  /* 编码器推算的车体角速度，可与 IMU yaw 速率互校 */
+    /* 定原点那一刻的 IMU yaw。路径跟踪算出的目标航向是"路径坐标系"里的，
+     * 要加上这个偏移才能变成转向环使用的 IMU 绝对 yaw。 */
+    float yaw_offset_deg;
     uint8_t valid;         /* 0 表示还没定原点或还没积分成功，此时数值不可信 */
 } app_pose_t;
 

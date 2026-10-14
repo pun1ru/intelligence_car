@@ -3,7 +3,8 @@ import unittest
 
 from protocol import (
     BALANCE, FEEDFORWARD, MOTION, NAV_POSE_LENGTH, NAV_POSE_TYPE, PID_BASE,
-    POSE_VALID_DATA, POSE_VALID_NAVIGATION, STATE, STEERING_FEEDFORWARD,
+    POSE_VALID_DATA, POSE_VALID_NAVIGATION, POSE_VALID_TRACKING, STATE,
+    STEERING_FEEDFORWARD,
     SUPPORT, TELEMETRY_LENGTH, NavPoseTelemetry, SequenceTracker, TelemetryParser,
     command_frame, crc16, decode_nav_pose, decode_telemetry, feedforward_frame,
     pid_frame, steering_feedforward_frame,
@@ -27,16 +28,20 @@ def sample_frame() -> bytes:
 def sample_pose_frame() -> bytes:
     frame = bytearray(NAV_POSE_LENGTH)
     frame[:6] = bytes((0x5A, 0xA5, 1, NAV_POSE_TYPE, 3,
-                       POSE_VALID_DATA | POSE_VALID_NAVIGATION))
-    struct.pack_into("<5h", frame, 6, -1234, 567, 9000, 2345, -125)
-    struct.pack_into("<H", frame, 16, crc16(frame[:16]))
+                       POSE_VALID_DATA | POSE_VALID_NAVIGATION
+                       | POSE_VALID_TRACKING))
+    struct.pack_into("<8h", frame, 6, -1234, 567, 9000, 2345, -125,
+                     450, -1234, -80)
+    frame[22] = 3
+    struct.pack_into("<H", frame, 23, crc16(frame[:23]))
     return bytes(frame)
 
 
 # 固定向量：由车端编码器本人产出（tests/host/pose_frame_dump.c 调用
 # app_serial_encode_pose 打印出来的字节）。这样"C 端怎么填帧"和
 # "Python 怎么解帧"就不会各改各的而没人发现。
-VEHICLE_POSE_FRAME = bytes.fromhex("5aa5018203032efb37022823290983ff5d74")
+VEHICLE_POSE_FRAME = bytes.fromhex(
+    "5aa5018203072efb37022823290983ffc2012efbb0ff03ac53")
 
 
 class ProtocolTest(unittest.TestCase):
@@ -90,7 +95,13 @@ class ProtocolTest(unittest.TestCase):
         self.assertEqual(decoded.heading_deg, 90.0)
         self.assertEqual(decoded.path_length_m, 2.345)
         self.assertEqual(decoded.yaw_rate_rad_s, -0.125)
-        self.assertEqual(decoded.valid, POSE_VALID_DATA | POSE_VALID_NAVIGATION)
+        self.assertTrue(decoded.nav_active)
+        self.assertEqual(decoded.nav_target_speed_m_s, 0.45)
+        self.assertEqual(decoded.nav_target_yaw_deg, -12.34)
+        self.assertEqual(decoded.nav_cross_track_m, -0.08)
+        self.assertEqual(decoded.nav_target_index, 3)
+        self.assertEqual(decoded.valid, POSE_VALID_DATA | POSE_VALID_NAVIGATION
+                         | POSE_VALID_TRACKING)
 
         # 车端是把三种帧连着发出来的，所以解析器必须能在一段字节流里按类型
         # 各自切帧——这是实际链路上最容易出错的地方。
@@ -117,8 +128,13 @@ class ProtocolTest(unittest.TestCase):
         self.assertEqual(decoded.heading_deg, 90.0)
         self.assertEqual(decoded.path_length_m, 2.345)
         self.assertEqual(decoded.yaw_rate_rad_s, -0.125)
-        self.assertEqual(decoded.valid,
-                         POSE_VALID_DATA | POSE_VALID_NAVIGATION)
+        self.assertTrue(decoded.nav_active)
+        self.assertEqual(decoded.nav_target_speed_m_s, 0.45)
+        self.assertEqual(decoded.nav_target_yaw_deg, -12.34)
+        self.assertEqual(decoded.nav_cross_track_m, -0.08)
+        self.assertEqual(decoded.nav_target_index, 3)
+        self.assertEqual(decoded.valid, POSE_VALID_DATA | POSE_VALID_NAVIGATION
+                         | POSE_VALID_TRACKING)
         self.assertEqual(sample_pose_frame(), VEHICLE_POSE_FRAME)
 
     def test_sequence_tracker_counts_missing_frames(self):

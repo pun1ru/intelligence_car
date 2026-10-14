@@ -1,6 +1,7 @@
 #include "decision_task.h"
 
 #include "FreeRTOS.h"
+#include "app_nav.h"
 #include "app_pose.h"
 #include "general_define.h"
 #include "queue.h"
@@ -30,11 +31,13 @@
 typedef struct
 {
     app_pose_t pose;
+    app_nav_command_t nav;
     TickType_t publish_tick;  /* 写入时刻，用于判断快照是否已过期 */
 } pose_snapshot_t;
 
 static QueueHandle_t pose_queue;
 static app_pose_state_t pose_state;
+static app_nav_state_t nav_state;
 
 uint8_t decision_task_get_pose(app_pose_t *pose)
 {
@@ -49,6 +52,21 @@ uint8_t decision_task_get_pose(app_pose_t *pose)
         return 0U;
     }
     *pose = snapshot.pose;
+    return 1U;
+}
+
+uint8_t decision_task_get_nav(app_nav_command_t *nav)
+{
+    pose_snapshot_t snapshot;
+
+    if ((nav == NULL) || (pose_queue == NULL) ||
+        (xQueuePeek(pose_queue, &snapshot, 0U) != pdTRUE) ||
+        ((xTaskGetTickCount() - snapshot.publish_tick) >
+         pdMS_TO_TICKS(VEHICLE_POSE_TIMEOUT_MS)))
+    {
+        return 0U;
+    }
+    *nav = snapshot.nav;
     return 1U;
 }
 
@@ -73,6 +91,7 @@ void decision_task(void *pvParameters)
         return;
     }
     app_pose_init(&pose_state);
+    app_nav_init(&nav_state);
 
     for (;;)
     {
@@ -139,8 +158,20 @@ void decision_task(void *pvParameters)
             previous_calibrating = calibrating;
         }
 
+        /* 路径跟踪：算目标速度与目标航向。这一阶段只计算并发布，不驱动电机，
+         * 所以未使能、位姿不可信、路径为空时它什么都不做（active 为 0）。 */
+        if (state_valid != 0U)
+        {
+            /* 只在导航状态输出跟踪指令；总开关由 app_nav 自己持有（编译期默认值，
+             * 以后可由上位机调试时改写）。非导航状态传 NULL，指令直接失效。 */
+            app_nav_step(&nav_state,
+                         (state.vehicle_mode == APP_VEHICLE_NAVIGATION) ?
+                         &pose_state.pose : NULL);
+        }
+
         /* 不管这一拍算没算，都发布一次：valid 位会告诉上位机数据可不可信 */
         app_pose_snapshot(&pose_state, &snapshot.pose);
+        app_nav_snapshot(&nav_state, &snapshot.nav);
         snapshot.publish_tick = xTaskGetTickCount();
         (void)xQueueOverwrite(pose_queue, &snapshot);
         task_metrics_end(TASK_METRIC_DECISION, metric_start);

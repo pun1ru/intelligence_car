@@ -1463,6 +1463,16 @@
               <FileType>5</FileType>
               <FilePath>..\..\libraries\myApplication\navigation\app_nav_path.h</FilePath>
             </File>
+            <File>
+              <FileName>app_nav.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\libraries\myApplication\navigation\app_nav.c</FilePath>
+            </File>
+            <File>
+              <FileName>app_nav.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\..\libraries\myApplication\navigation\app_nav.h</FilePath>
+            </File>
           </Files>
         </Group>
         <Group>

@@ -44,10 +44,12 @@ CALIBRATION_TYPE = 0x81
 # 导航位姿单独占一种帧类型，这样 52 字节定长遥测帧不用改动，旧固件与
 # 旧上位机仍然兼容（对应车端 general_define.h 的 SERIAL_NAV_POSE_*）。
 NAV_POSE_TYPE = 0x82
-NAV_POSE_LENGTH = 18
+NAV_POSE_LENGTH = 25
 # 位姿帧 valid 字节的位：bit0 数值可信、bit1 发送时车辆处于导航状态
 POSE_VALID_DATA = 1
 POSE_VALID_NAVIGATION = 2
+# bit2：本帧带了有效的路径跟踪指令
+POSE_VALID_TRACKING = 4
 
 
 def pid_frame(controller: int, gain: int, value: float) -> bytes:
@@ -166,6 +168,11 @@ class NavPoseTelemetry:
     heading_deg: float     # 相对原点航向偏角，[-180, 180]
     path_length_m: float   # 累计行程，用来单独核对里程标定
     yaw_rate_rad_s: float  # 编码器推算角速度，可与遥测帧的 IMU yaw 速率对比
+    nav_active: bool       # bit2 为 1 时，下面四项才是当前有效的跟踪指令
+    nav_target_speed_m_s: float  # 路径跟踪的目标速度
+    nav_target_yaw_deg: float    # 路径跟踪的目标航向（IMU 坐标系）
+    nav_cross_track_m: float     # 到路径的横向偏差，正=在路径左侧
+    nav_target_index: int        # 当前前视点在路径表中的序号
 
 
 def decode_telemetry(frame: bytes) -> Telemetry:
@@ -220,13 +227,19 @@ def decode_nav_pose(frame: bytes) -> NavPoseTelemetry:
         raise ValueError("invalid navigation pose frame boundary")
     if frame[2:4] != bytes((VERSION, NAV_POSE_TYPE)):
         raise ValueError("unsupported navigation pose version or type")
-    if crc16(frame[:-2]) != struct.unpack_from("<H", frame, 16)[0]:
+    if crc16(frame[:-2]) != struct.unpack_from("<H", frame, 23)[0]:
         raise ValueError("navigation pose CRC mismatch")
-    x_mm, y_mm, heading, path_mm, yaw_rate = struct.unpack_from("<5h", frame, 6)
+    (x_mm, y_mm, heading, path_mm, yaw_rate,
+     nav_speed, nav_yaw, nav_cross) = struct.unpack_from("<8h", frame, 6)
     return NavPoseTelemetry(
         sequence=frame[4], valid=frame[5],
         x_m=x_mm / 1000, y_m=y_mm / 1000, heading_deg=heading / 100,
         path_length_m=path_mm / 1000, yaw_rate_rad_s=yaw_rate / 1000,
+        nav_active=bool(frame[5] & POSE_VALID_TRACKING),
+        nav_target_speed_m_s=nav_speed / 1000,
+        nav_target_yaw_deg=nav_yaw / 100,
+        nav_cross_track_m=nav_cross / 1000,
+        nav_target_index=frame[22],
     )
 
 

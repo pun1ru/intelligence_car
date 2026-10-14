@@ -62,12 +62,18 @@ typedef struct
  * docs/SERIAL_PROTOCOL.md 的 0x82 帧。单位都是浮点原值，编码函数内部换算。 */
 typedef struct
 {
-    uint8_t valid;          /* SERIAL_POSE_VALID_* 位：bit0 位姿可信、bit1 在导航中 */
+    uint8_t valid;          /* SERIAL_POSE_VALID_* 位：bit0 位姿可信、bit1 在导航中、
+                             * bit2 路径跟踪正在输出有效指令 */
     float x_m;              /* 相对原点前后位移，+X 向前，m */
     float y_m;              /* 相对原点左右位移，+Y 向左，m */
     float heading_deg;      /* 相对原点航向偏角，deg */
     float path_length_m;    /* 自原点起的累计行程，m */
     float yaw_rate_rad_s;   /* 编码器推算的车体角速度，rad/s */
+    /* 路径跟踪指令（valid 的 bit2 为 1 时才有效），由 app_nav 产生 */
+    float nav_target_speed_m_s;  /* 目标线速度，m/s */
+    float nav_target_yaw_deg;    /* 目标航向，IMU 坐标系，deg */
+    float nav_cross_track_m;     /* 到路径的横向偏差，m，正=在路径左侧 */
+    uint8_t nav_target_index;    /* 当前前视点在路径表中的序号 */
 } app_serial_pose_t;
 
 void app_serial_init(void);

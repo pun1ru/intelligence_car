@@ -140,6 +140,16 @@
 #define VEHICLE_STATE_TIMEOUT_MS     30U
 #define VEHICLE_CONTROL_TIMEOUT_MS   30U
 #define VEHICLE_POSE_TIMEOUT_MS      50U
+
+/* 导航路径跟踪（Pure Pursuit）。速度与半径都是保守初值，上车后按表现调整。
+ * NAV_TRACKING_ENABLE_DEFAULT 是跟踪总开关：正式比赛禁用无线，开关必须在这里
+ * 定好（设 1），否则上位机没法把它打开。 */
+#define NAV_TRACKING_ENABLE_DEFAULT  1U
+#define NAV_TRACKING_LOOKAHEAD_M     0.40f
+#define NAV_TRACKING_SPEED_MAX_M_S   0.60f
+#define NAV_TRACKING_SPEED_MIN_M_S   0.15f
+#define NAV_TRACKING_SLOW_RADIUS_M   0.50f
+#define NAV_TRACKING_GOAL_RADIUS_M   0.10f
 #define VEHICLE_ARM_PITCH_MAX_DEG    10.0f
 #define VEHICLE_SUPPORT_ARM_PITCH_MAX_DEG 4.0f
 #define VEHICLE_SUPPORT_AUTO_MIN_PITCH_DEG -100.0f
@@ -207,10 +217,15 @@
 /* 导航位姿单独用一种上行帧，这样 52 字节定长遥测帧一个字节都不用动，
  * 旧固件/旧上位机仍能按原帧长解析。帧格式见 docs/SERIAL_PROTOCOL.md。 */
 #define SERIAL_NAV_POSE_TYPE         0x82U
-#define SERIAL_NAV_POSE_LENGTH       18U
+#define SERIAL_NAV_POSE_LENGTH       25U
 /* 位姿帧 valid 字节的位定义 */
 #define SERIAL_POSE_VALID_DATA       0x01U  /* 位姿已定原点并成功积分，数值可信 */
 #define SERIAL_POSE_VALID_NAVIGATION 0x02U  /* 发送时刻车辆处于导航状态 */
+#define SERIAL_POSE_VALID_TRACKING   0x04U  /* 路径跟踪正在输出有效指令 */
+/* 位姿帧里导航指令字段的缩放：速度 0.001 m/s、横向偏差 0.001 m，
+ * 目标航向复用 SERIAL_ANGLE_UNITS_PER_DEG（0.01 deg）。 */
+#define SERIAL_POSE_NAV_SPEED_UNITS_PER_MPS 1000.0f
+#define SERIAL_POSE_NAV_OFFSET_UNITS_PER_M  1000.0f
 /* 位姿帧各字段的定点缩放：位置用 0.001 m，角速度用 0.001 rad/s；
  * 航向复用 SERIAL_ANGLE_UNITS_PER_DEG（0.01 deg）。 */
 #define SERIAL_POSE_POSITION_UNITS_PER_M  1000.0f

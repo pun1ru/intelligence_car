@@ -107,6 +107,7 @@ void send_task(void *pvParameters)
         else if ((tick % SEND_SLOW_TICKS) == 1U)
         {
             app_serial_pose_t pose_telemetry = {0};
+            app_nav_command_t nav;
             app_state_t state;
             app_pose_t pose;
 
@@ -124,6 +125,16 @@ void send_task(void *pvParameters)
                 pose_telemetry.heading_deg = pose.heading_deg;
                 pose_telemetry.path_length_m = pose.path_length_m;
                 pose_telemetry.yaw_rate_rad_s = pose.yaw_rate_rad_s;
+            }
+            /* 路径跟踪指令：只有 app_nav 认为本拍有效（active=1）才打上 bit2，
+             * 否则上位机看到的就是 "--"，不会把过期的目标当成当前指令 */
+            if ((decision_task_get_nav(&nav) != 0U) && (nav.active != 0U))
+            {
+                pose_telemetry.valid |= SERIAL_POSE_VALID_TRACKING;
+                pose_telemetry.nav_target_speed_m_s = nav.target_speed_m_s;
+                pose_telemetry.nav_target_yaw_deg = nav.target_yaw_deg;
+                pose_telemetry.nav_cross_track_m = nav.cross_track_m;
+                pose_telemetry.nav_target_index = (uint8_t)nav.target_index;
             }
             if ((state_task_get_snapshot(&state) != 0U) &&
                 (state.vehicle_mode == APP_VEHICLE_NAVIGATION))

@@ -108,3 +108,13 @@
 - 结论：陀螺零偏主要随温度漂移，**必须等 IMU 热起来再校准**，否则校准值在随后的运行中就会失效。热机后的残余漂移已低于 2 分钟尺度的测量噪声（显示两位小数、IMU 本身有抖动），折算到 60 秒的一趟不到 0.2°，对导航可以忽略。因此不需要再引入"编码器角速度互补校正 yaw 漂移"这类结构性方案。
 - 操作路径（两条等价）：上位机 `Motion control` 栏的 `Calibrate gyro bias (20 s still)`；或双开 C26/C27 后按一下 C12。两条路都要求车静止 20 秒，且期间不要按 C14/C15。
 - 未解决：位姿标定（推一格看 `X`/`path length` 是否 ±0.92）与台阶测试需在 yaw 修好后重做——之前那次 26° 的航向偏差主要来自这个漂移；路径表与 Pure Pursuit 接入仍待做。
+
+## 2026-10-14（路径跟踪：算指令这一层接好）
+
+- 变更：新增 `myApplication/navigation/app_nav`，把位姿和路径表接起来：只在导航状态、位姿可信（`valid`）、路径表非空时调用 `pure_pursuit`，并把算出的目标航向从路径坐标系加上"定原点时的 yaw 偏移"换算成 IMU 绝对航向——这样转向环可以直接用，不需要知道路径坐标系。任一条件不满足时把 `active` 清 0，宁可不动也不用错误指令。
+- 变更：`app_pose_t` 增加 `yaw_offset_deg`（`app_pose_set_origin` 时记录），供上述换算使用。
+- 变更：`decision_task` 每个周期调用 `app_nav_step`，把指令与位姿一起发布，并新增 `decision_task_get_nav`。
+- 变更：0x82 位姿帧由 18 字节扩到 **25 字节**，新增 `nav_target_speed`、`nav_target_yaw`、`nav_cross_track`、`nav_target_index` 四个字段，`valid` 增加 bit2 表示"本帧带有效跟踪指令"；上位机解析并在轨迹页顶部显示 `Nav: on v=… yaw=… cross=… pt=…`。帧长变了，但两端一起改并做了固定向量交叉验证。
+- 变更：路径表暂时填入**示例 S 形路径**（`APP_NAV_PATH_DEFINED = 1`，注释里写明比赛前必须整体替换）；`general_define.h` 新增 `NAV_TRACKING_ENABLE_DEFAULT`（当前 1，供本轮台架验证）与前视距离/速度上下限等参数。**电机仍然不受影响**：本轮的指令只用于显示，`app_control` 还没有消费它。
+- 验证：Keil 全量编译 `0 Error(s), 0 Warning(s)`，`Code=103936 -> 106904`；`tests/host/pure_pursuit_test` 29 项、`odometry_test` 25 项通过；`python -m unittest test_protocol` 6 项通过，其中固定向量 `5aa5018203072efb37022823290983ffc2012efbb0ff03ac53` 由车端编码器本人生成，确认 C 端与 Python 端 25 字节布局一致。界面用构造帧验证：带 bit2 显示 `Nav: on …`，不带则显示 `Nav: off`。
+- 未解决：指令尚未驱动电机；`NAV_TRACKING_ENABLE_DEFAULT` 与示例路径都还没换成比赛值；位姿的台阶测试仍待做。

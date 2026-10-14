@@ -43,12 +43,17 @@ int main(void)
     uint8_t index;
 
     /* Values chosen to exercise negative, zero and boundary-adjacent scales. */
-    pose.valid = SERIAL_POSE_VALID_DATA | SERIAL_POSE_VALID_NAVIGATION;
+    pose.valid = SERIAL_POSE_VALID_DATA | SERIAL_POSE_VALID_NAVIGATION |
+                 SERIAL_POSE_VALID_TRACKING;
     pose.x_m = -1.234f;
     pose.y_m = 0.567f;
     pose.heading_deg = 90.0f;
     pose.path_length_m = 2.345f;
     pose.yaw_rate_rad_s = -0.125f;
+    pose.nav_target_speed_m_s = 0.45f;
+    pose.nav_target_yaw_deg = -12.34f;
+    pose.nav_cross_track_m = -0.08f;
+    pose.nav_target_index = 3U;
 
     if (app_serial_encode_pose(&pose, 3U, frame) == 0U)
     {
