@@ -370,7 +370,10 @@ uint8_t app_control_step(const app_state_t *state,
     app_balance_set_steering_feedforward(&angle_control,
                                          state->steering_feedforward_gain);
 
-    nav_used = ((nav != NULL) && (nav->active != 0U) &&
+    /* NAV_TRACKING_DRIVE_ENABLE 为 0 时只算不动：指令照常发布给上位机看，
+     * 但控制环不用它，车保持原地平衡（见 general_define.h 的说明）。 */
+    nav_used = ((NAV_TRACKING_DRIVE_ENABLE != 0U) && (nav != NULL) &&
+                (nav->active != 0U) &&
                 (state->vehicle_mode == APP_VEHICLE_NAVIGATION)) ? 1U : 0U;
     effective_speed_m_s = (nav_used != 0U) ? nav->target_speed_m_s :
                           state->target_speed_m_s;
