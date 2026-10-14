@@ -35,9 +35,10 @@ HEARTBEAT_MS = 100
 KEYBOARD_PERIOD_MS = 100
 STALE_S = 0.5
 HISTORY_LENGTH = 600
+TIMEOUT_NOTICE = "Telemetry timeout; protection requested."
 # 显示在窗口标题里。桌面上存在多份仓库副本，靠这个标记一眼看出窗口跑的是哪份
 # 代码：标题里没有这个标记，就说明打开的是旧副本或改动前的旧进程。
-UI_VERSION = "v5-pose"
+UI_VERSION = "v6-pose"
 MODES = ("Button", "Serial", "Calibration")
 STATES = ("Protect", "Balance", "Navigation", "Support")
 CHARTS = (
@@ -71,6 +72,13 @@ class Console(tk.Tk):
         self.last_heartbeat_at = 0.0
         self.sequence = SequenceTracker()
         self.last_protect_at = 0.0
+        # 遥测帧到达间隔，用来区分"车端发得慢"和"链路丢包"：
+        # 间隔变大但 lost 不涨 = 车端没按时发；lost 跟着涨 = 链路丢帧。
+        self.periods: deque[float] = deque(maxlen=50)
+        self.last_telemetry_at = 0.0
+        # 底部的提示行以前只在超时事件里写一次，恢复后仍留着旧文字，
+        # 容易让人以为"现在还在超时"，所以改成跟着状态切换。
+        self.timeout_notice_shown = False
         self.latest_frame: Telemetry | None = None
         # 车端 0x82 帧报来的位姿，仅用于和主机端推算做对比
         self.latest_pose: NavPoseTelemetry | None = None
@@ -172,7 +180,9 @@ class Console(tk.Tk):
         for col, (key, label) in enumerate((("pose", "Vehicle pose (x, y)"),
                                            ("pose_path", "Vehicle path length"),
                                            ("pose_yaw_rate",
-                                            "Yaw rate from wheels (deg/s)"))):
+                                            "Yaw rate from wheels (deg/s)"),
+                                           ("frame_period",
+                                            "Frame period now/max (ms)"))):
             ttk.Label(state, text=label).grid(row=2, column=col * 2,
                                               sticky="w", pady=(6, 0))
             self.metrics[key] = tk.StringVar(value="--")
@@ -414,6 +424,9 @@ class Console(tk.Tk):
             return
         self.parser = TelemetryParser()
         self.sequence.reset()
+        self.periods.clear()
+        self.last_telemetry_at = 0.0
+        self.timeout_notice_shown = False
         self.last_frame_at = 0.0
         self.last_heartbeat_at = 0.0
         self.last_protect_at = 0.0
@@ -580,6 +593,12 @@ class Console(tk.Tk):
             self.metrics[key].set(value)
 
     def display(self, frame: Telemetry) -> None:
+        now = time.monotonic()
+        if self.last_telemetry_at > 0.0:
+            self.periods.append((now - self.last_telemetry_at) * 1000.0)
+            self.metrics["frame_period"].set(
+                f"{self.periods[-1]:.0f} / {max(self.periods):.0f}")
+        self.last_telemetry_at = now
         self.latest_frame = frame
         self.metrics["quality"].set(
             f"lost {self.sequence.lost} / bad {self.parser.bad_frames}")
@@ -830,7 +849,12 @@ class Console(tk.Tk):
                         now - self.last_protect_at >= HEARTBEAT_MS / 1000.0):
                     self.port.write(command_frame(STATE, PROTECT))
                     self.last_protect_at = now
-                    self.notice.set("Telemetry timeout; protection requested.")
+                    if not self.timeout_notice_shown:
+                        self.notice.set(TIMEOUT_NOTICE)
+                        self.timeout_notice_shown = True
+                elif self.timeout_notice_shown:
+                    self.notice.set("Telemetry recovered.")
+                    self.timeout_notice_shown = False
                 self.status.set("Telemetry online" if self.telemetry_online() else "Telemetry timeout")
             except (serial.SerialException, serial.SerialTimeoutException) as exc:
                 self.notice.set(f"Communication error: {exc}")

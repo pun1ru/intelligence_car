@@ -14,7 +14,12 @@
 #define ESTIMATE_TASK_PERIOD_MS 1U
 #define CONTROL_TASK_PERIOD_MS 5U
 #define RECEIVE_TASK_PERIOD_MS 1U
-#define SEND_TASK_PERIOD_MS 100U
+/* 发送时隙：发送任务每 SEND_TASK_PERIOD_MS 醒一次，一个时隙只发一帧。
+ * 三帧分散在三个时隙里（见 send_task.c），一轮仍是 SEND_TELEMETRY_PERIOD_MS。
+ * 这样做的原因是实测无线模块会丢弃连发帧的尾部：以前三帧连发共 94 字节，
+ * 模块缓冲装不下，靠后的校准帧和位姿帧经常整帧丢失。 */
+#define SEND_TASK_PERIOD_MS 20U
+#define SEND_TELEMETRY_PERIOD_MS 100U
 #define DEBUG_TASK_PERIOD_MS 100U
 
 #define IMU_GYRO_CALIBRATION_TIME_MS 20000U
