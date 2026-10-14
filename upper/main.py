@@ -37,7 +37,7 @@ STALE_S = 0.5
 HISTORY_LENGTH = 600
 # 显示在窗口标题里。桌面上存在多份仓库副本，靠这个标记一眼看出窗口跑的是哪份
 # 代码：标题里没有这个标记，就说明打开的是旧副本或改动前的旧进程。
-UI_VERSION = "v4-pose"
+UI_VERSION = "v5-pose"
 MODES = ("Button", "Serial", "Calibration")
 STATES = ("Protect", "Balance", "Navigation", "Support")
 CHARTS = (
@@ -51,6 +51,9 @@ CHARTS = (
 def wrap_angle_deg(angle: float) -> float:
     """Return an angle in [-180, 180], preserving the shortest turn command."""
     return (angle + 180.0) % 360.0 - 180.0
+
+
+DEG_PER_RAD = 57.29577951308232
 
 
 class Console(tk.Tk):
@@ -167,7 +170,9 @@ class Console(tk.Tk):
         # 分栏所在行有 weight=1，窗口高度不够时会被压缩并裁掉最后几行；
         # 这里按内容取高，永远显示得下。数据来自 0x82 帧，见 protocol.py。
         for col, (key, label) in enumerate((("pose", "Vehicle pose (x, y)"),
-                                           ("pose_path", "Vehicle path length"))):
+                                           ("pose_path", "Vehicle path length"),
+                                           ("pose_yaw_rate",
+                                            "Yaw rate from wheels (deg/s)"))):
             ttk.Label(state, text=label).grid(row=2, column=col * 2,
                                               sticky="w", pady=(6, 0))
             self.metrics[key] = tk.StringVar(value="--")
@@ -675,9 +680,13 @@ class Console(tk.Tk):
         if not frame.valid & POSE_VALID_DATA:
             self.metrics["pose"].set("--")
             self.metrics["pose_path"].set("--")
+            self.metrics["pose_yaw_rate"].set("--")
             return
         self.metrics["pose"].set(f"{frame.x_m:.2f}, {frame.y_m:.2f}")
         self.metrics["pose_path"].set(f"{frame.path_length_m:.2f}")
+        # 帧里是 rad/s，这里换成 deg/s 方便和 Yaw 那一栏的变化速度直接对比
+        self.metrics["pose_yaw_rate"].set(
+            f"{frame.yaw_rate_rad_s * DEG_PER_RAD:.1f}")
         self.vehicle_pose_points.append((frame.x_m, frame.y_m))
         self._draw_trajectory()
 
