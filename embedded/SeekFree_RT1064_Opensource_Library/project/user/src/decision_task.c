@@ -160,14 +160,11 @@ void decision_task(void *pvParameters)
 
         /* 路径跟踪：算目标速度与目标航向。这一阶段只计算并发布，不驱动电机，
          * 所以未使能、位姿不可信、路径为空时它什么都不做（active 为 0）。 */
-        if (state_valid != 0U)
-        {
-            /* 只在导航状态输出跟踪指令；总开关由 app_nav 自己持有（编译期默认值，
-             * 以后可由上位机调试时改写）。非导航状态传 NULL，指令直接失效。 */
-            app_nav_step(&nav_state,
-                         (state.vehicle_mode == APP_VEHICLE_NAVIGATION) ?
-                         &pose_state.pose : NULL);
-        }
+        /* 跟踪指令在每个周期都算一次，**不要求处于导航状态**：只有"是否用它驱动
+         * 电机"才需要导航状态（判断在 app_control 里）。这样台架验证可以在保护
+         * 状态下手推着车做——电机不工作，零风险，也不需要改任何开关。
+         * 位姿不可信时 app_nav_step 自己会把指令标为无效。 */
+        app_nav_step(&nav_state, &pose_state.pose);
 
         /* 不管这一拍算没算，都发布一次：valid 位会告诉上位机数据可不可信 */
         app_pose_snapshot(&pose_state, &snapshot.pose);
