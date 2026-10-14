@@ -23,8 +23,9 @@ except ImportError:
 from protocol import (
     BALANCE, HEARTBEAT, MOTION, NAVIGATION, PROTECT, STATE, SUPPORT,
     VALID_ATTITUDE, VALID_CONTROL, VALID_IMU, VALID_LIFT, VALID_MOTION,
-    VALID_STATE, POSE_VALID_DATA, CalibrationTelemetry, NavPoseTelemetry,
-    SequenceTracker, Telemetry, TelemetryParser, calibration_frame,
+    VALID_STATE, POSE_VALID_DATA, POSE_VALID_NAVIGATION, CalibrationTelemetry,
+    NavPoseTelemetry, SequenceTracker, Telemetry, TelemetryParser,
+    calibration_frame,
     command_frame, feedforward_frame, pid_frame, steering_feedforward_frame,
     steering_frame,
 )
@@ -40,7 +41,7 @@ DRAW_PERIOD_S = 0.2
 TIMEOUT_NOTICE = "Telemetry timeout; protection requested."
 # 显示在窗口标题里。桌面上存在多份仓库副本，靠这个标记一眼看出窗口跑的是哪份
 # 代码：标题里没有这个标记，就说明打开的是旧副本或改动前的旧进程。
-UI_VERSION = "v9-pose"
+UI_VERSION = "v10-pose"
 MODES = ("Button", "Serial", "Calibration")
 STATES = ("Protect", "Balance", "Navigation", "Support")
 CHARTS = (
@@ -726,8 +727,12 @@ class Console(tk.Tk):
         self.metrics["pose_yaw_rate"].set(
             f"{frame.yaw_rate_rad_s * DEG_PER_RAD:.1f}")
         if frame.nav_active:
+            # 区分"算出了指令"和"真的在跟路线"：前者只要位姿可信、路径非空就有，
+            # 保护状态下手推车也能看到；后者还要求车辆处于导航状态（控制环才会用它）。
+            nav_state = ("driving" if frame.valid & POSE_VALID_NAVIGATION
+                         else "ready")
             self.nav_text.set(
-                f"Nav: on  v={frame.nav_target_speed_m_s:.2f} m/s  "
+                f"Nav: {nav_state}  v={frame.nav_target_speed_m_s:.2f} m/s  "
                 f"yaw={frame.nav_target_yaw_deg:+.1f} deg  "
                 f"cross={frame.nav_cross_track_m:+.2f} m  "
                 f"pt={frame.nav_target_index}")
