@@ -1,4 +1,10 @@
-"""UART8 wire format shared by the vehicle monitor and controller."""
+"""车端与上位机之间的 UART8 线上格式（下行命令帧 + 三种上行帧）。
+
+上行帧以 "5A A5" 开头，第 3 字节是类型：
+    0x80 车辆遥测 52 字节、0x81 校准 24 字节、0x82 导航位姿 18 字节。
+车端每 100 ms 依次发这三帧，所以解析器必须能在一段字节流里按类型切帧；
+解析失败时按单字节跳过重新同步，见 TelemetryParser。
+"""
 
 from dataclasses import dataclass
 import struct
@@ -35,6 +41,13 @@ VALID_CONTROL = 16
 VALID_LIFT = 32
 CALIBRATION_LENGTH = 24
 CALIBRATION_TYPE = 0x81
+# 导航位姿单独占一种帧类型，这样 52 字节定长遥测帧不用改动，旧固件与
+# 旧上位机仍然兼容（对应车端 general_define.h 的 SERIAL_NAV_POSE_*）。
+NAV_POSE_TYPE = 0x82
+NAV_POSE_LENGTH = 18
+# 位姿帧 valid 字节的位：bit0 数值可信、bit1 发送时车辆处于导航状态
+POSE_VALID_DATA = 1
+POSE_VALID_NAVIGATION = 2
 
 
 def pid_frame(controller: int, gain: int, value: float) -> bytes:
@@ -143,6 +156,18 @@ class CalibrationTelemetry:
     gyro_bias_z_dps: float
 
 
+@dataclass(frozen=True)
+class NavPoseTelemetry:
+    """0x82 帧：车端算出的位姿，字段语义见 docs/VEHICLE_CONVENTIONS.md。"""
+    sequence: int
+    valid: int             # POSE_VALID_* 位的或
+    x_m: float             # 相对原点前后位移，+X 向前
+    y_m: float             # 相对原点左右位移，+Y 向左
+    heading_deg: float     # 相对原点航向偏角，[-180, 180]
+    path_length_m: float   # 累计行程，用来单独核对里程标定
+    yaw_rate_rad_s: float  # 编码器推算角速度，可与遥测帧的 IMU yaw 速率对比
+
+
 def decode_telemetry(frame: bytes) -> Telemetry:
     if len(frame) != TELEMETRY_LENGTH or frame[:2] != TELEMETRY_SYNC:
         raise ValueError("invalid frame boundary")
@@ -188,15 +213,47 @@ def decode_calibration(frame: bytes) -> CalibrationTelemetry:
     )
 
 
+def decode_nav_pose(frame: bytes) -> NavPoseTelemetry:
+    """解码 0x82 帧。校验边界、版本/类型与 CRC，任一项不符就抛 ValueError，
+    由 TelemetryParser 记一次坏帧并继续找下一帧。"""
+    if len(frame) != NAV_POSE_LENGTH or frame[:2] != TELEMETRY_SYNC:
+        raise ValueError("invalid navigation pose frame boundary")
+    if frame[2:4] != bytes((VERSION, NAV_POSE_TYPE)):
+        raise ValueError("unsupported navigation pose version or type")
+    if crc16(frame[:-2]) != struct.unpack_from("<H", frame, 16)[0]:
+        raise ValueError("navigation pose CRC mismatch")
+    x_mm, y_mm, heading, path_mm, yaw_rate = struct.unpack_from("<5h", frame, 6)
+    return NavPoseTelemetry(
+        sequence=frame[4], valid=frame[5],
+        x_m=x_mm / 1000, y_m=y_mm / 1000, heading_deg=heading / 100,
+        path_length_m=path_mm / 1000, yaw_rate_rad_s=yaw_rate / 1000,
+    )
+
+
+# 帧类型 -> (线上长度, 解码函数)。遇到未知类型时退回按遥测帧长度处理，
+# 这样它会在 CRC 校验处失败，解析器于是按单字节继续找下一个帧头。
+FRAME_FORMATS = {
+    TYPE_TELEMETRY: (TELEMETRY_LENGTH, decode_telemetry),
+    CALIBRATION_TYPE: (CALIBRATION_LENGTH, decode_calibration),
+    NAV_POSE_TYPE: (NAV_POSE_LENGTH, decode_nav_pose),
+}
+
+
 class TelemetryParser:
     def __init__(self) -> None:
         self.buffer = bytearray()
         self.bad_frames = 0
 
-    def feed(self, data: bytes) -> list[Telemetry | CalibrationTelemetry]:
+    def feed(self, data: bytes) -> list[Telemetry | CalibrationTelemetry | NavPoseTelemetry]:
+        """喂入串口收到的任意长度字节，返回本次解析出的完整帧列表。
+
+        串口数据是流式的，可能一帧都没凑齐、也可能一次收到好几帧，
+        所以这里维护一个缓冲区：先找到帧头，再按类型取够长度才解码。
+        """
         self.buffer.extend(data)
         frames = []
         while len(self.buffer) >= 2:
+            # 丢弃帧头之前的杂字节；若结尾恰好是帧头前半字节则保留，等下批数据
             start = self.buffer.find(TELEMETRY_SYNC)
             if start < 0:
                 self.buffer[:] = self.buffer[-1:] if self.buffer[-1] == TELEMETRY_SYNC[0] else b""
@@ -205,15 +262,14 @@ class TelemetryParser:
                 del self.buffer[:start]
             if len(self.buffer) < 4:
                 break
-            frame_length = (CALIBRATION_LENGTH if self.buffer[3] == CALIBRATION_TYPE
-                            else TELEMETRY_LENGTH)
+            frame_length, decoder = FRAME_FORMATS.get(
+                self.buffer[3], (TELEMETRY_LENGTH, decode_telemetry))
             if len(self.buffer) < frame_length:
                 break
             try:
-                frame = (decode_calibration(self.buffer[:frame_length])
-                         if frame_length == CALIBRATION_LENGTH
-                         else decode_telemetry(self.buffer[:TELEMETRY_LENGTH]))
+                frame = decoder(bytes(self.buffer[:frame_length]))
             except ValueError:
+                # 校验失败：只前进一个字节，避免整段错位后一直丢帧
                 self.bad_frames += 1
                 del self.buffer[0]
                 continue

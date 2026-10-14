@@ -28,3 +28,10 @@ The realtime chart tab places the current values for the selected curves beside
 the plot. The trajectory tab uses a body frame captured when the trajectory is
 reset: `+X` is the vehicle forward direction and `+Y` is the vehicle left
 direction, both shown with arrows and metre units.
+
+The trajectory tab draws the host-side fusion (blue) together with the pose the
+vehicle reports in frame type `0x82` (orange). The two overlap while the
+vehicle-side estimator is healthy, and diverging curves point at wheel slip, a
+scale error or yaw drift. The `Vehicle pose (x, y)` and `Vehicle path length`
+readouts show the vehicle's own numbers and sit in the `Vehicle state` box at
+the top of the window; see `docs/SERIAL_PROTOCOL.md` for the frame layout.

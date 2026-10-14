@@ -23,9 +23,9 @@ except ImportError:
 from protocol import (
     BALANCE, HEARTBEAT, MOTION, NAVIGATION, PROTECT, STATE, SUPPORT,
     VALID_ATTITUDE, VALID_CONTROL, VALID_IMU, VALID_LIFT, VALID_MOTION,
-    VALID_STATE, CalibrationTelemetry, Telemetry, TelemetryParser,
-    calibration_frame, command_frame, feedforward_frame, pid_frame,
-    steering_feedforward_frame, steering_frame,
+    VALID_STATE, POSE_VALID_DATA, CalibrationTelemetry, NavPoseTelemetry,
+    Telemetry, TelemetryParser, calibration_frame, command_frame,
+    feedforward_frame, pid_frame, steering_feedforward_frame, steering_frame,
 )
 
 BAUD = 115200
@@ -34,6 +34,9 @@ HEARTBEAT_MS = 100
 KEYBOARD_PERIOD_MS = 100
 STALE_S = 0.5
 HISTORY_LENGTH = 600
+# 显示在窗口标题里。桌面上存在多份仓库副本，靠这个标记一眼看出窗口跑的是哪份
+# 代码：标题里没有这个标记，就说明打开的是旧副本或改动前的旧进程。
+UI_VERSION = "v3-pose"
 MODES = ("Button", "Serial", "Calibration")
 STATES = ("Protect", "Balance", "Navigation", "Support")
 CHARTS = (
@@ -52,8 +55,11 @@ def wrap_angle_deg(angle: float) -> float:
 class Console(tk.Tk):
     def __init__(self) -> None:
         super().__init__()
-        self.title("Two-wheel balance vehicle console")
-        self.geometry("1180x820")
+        self.title(f"Two-wheel balance vehicle console [{UI_VERSION}]")
+        # 窗口高度要放得下全部内容：Notebook 所在行是唯一带 weight 的行，窗口偏矮时
+        # 压缩全部落在它身上，Live values 的两个读数框会被裁掉最后几行（校准读数就在那里）。
+        # 内容实测需要约 1020 px，所以默认给 1000，屏幕再小也可以手动缩小。
+        self.geometry("1180x1000")
         self.minsize(980, 700)
         self.port: serial.Serial | None = None
         self.parser = TelemetryParser()
@@ -63,6 +69,8 @@ class Console(tk.Tk):
         self.last_protect_at = 0.0
         self.lost_frames = 0
         self.latest_frame: Telemetry | None = None
+        # 车端 0x82 帧报来的位姿，仅用于和主机端推算做对比
+        self.latest_pose: NavPoseTelemetry | None = None
 
         self.status = tk.StringVar(value="Disconnected")
         self.port_name = tk.StringVar()
@@ -81,6 +89,8 @@ class Console(tk.Tk):
         self.pid_controller = tk.StringVar(value="Angle loop")
         self.pid_gain = tk.StringVar(value="Kp")
         self.pid_value = tk.StringVar(value="600.0")
+        # 面板里的初值要和车端 general_define.h 的默认值一致，
+        # 否则刚连上时显示的"当前值"是错的。改固件默认值时记得同步这里。
         self.pid_values = {
             ("Wheel speed loop", "Kp"): 5000.0,
             ("Wheel speed loop", "Ki"): 0.0,
@@ -88,10 +98,10 @@ class Console(tk.Tk):
             ("Angle loop", "Kp"): 600.0,
             ("Angle loop", "Ki"): 0.0,
             ("Angle loop", "Kd"): 30.0,
-            ("Speed loop", "Kp"): 16.0,
+            ("Speed loop", "Kp"): 24.0,
             ("Speed loop", "Ki"): 3.0,
             ("Speed loop", "Kd"): 0.0,
-            ("Steering loop", "Kp"): 100.0,
+            ("Steering loop", "Kp"): 30.0,
             ("Steering loop", "Ki"): 2.0,
             ("Steering loop", "Kd"): 0.0,
         }
@@ -105,6 +115,10 @@ class Console(tk.Tk):
         self.trajectory_y = 0.0
         self.last_trajectory_uptime_ms: int | None = None
         self.trajectory_heading_zero_deg: float | None = None
+        # 车端自己算的位姿轨迹点。主机端也有一套用轮速+yaw 积分的推算
+        # （trajectory_points），两条曲线画在一起就能看出估计器是否可信。
+        self.vehicle_pose_points: deque[tuple[float, float]] = deque(
+            [(0.0, 0.0)], maxlen=HISTORY_LENGTH * 4)
         self.plot_choice = tk.StringVar(value=CHARTS[0])
         self.chart_readout_names: list[tk.StringVar] = []
         self.chart_readout_values: list[tk.StringVar] = []
@@ -149,6 +163,18 @@ class Console(tk.Tk):
             ttk.Label(state, textvariable=self.metrics[key],
                       font=("Segoe UI", 11, "bold")).grid(
                           row=1, column=col, sticky="w", pady=(2, 0))
+        # 车端位姿放在这个框里，而不是下面 Live values 的分栏里：
+        # 分栏所在行有 weight=1，窗口高度不够时会被压缩并裁掉最后几行；
+        # 这里按内容取高，永远显示得下。数据来自 0x82 帧，见 protocol.py。
+        for col, (key, label) in enumerate((("pose", "Vehicle pose (x, y)"),
+                                           ("pose_path", "Vehicle path length"))):
+            ttk.Label(state, text=label).grid(row=2, column=col * 2,
+                                              sticky="w", pady=(6, 0))
+            self.metrics[key] = tk.StringVar(value="--")
+            ttk.Label(state, textvariable=self.metrics[key],
+                      font=("Segoe UI", 11, "bold")).grid(
+                          row=2, column=col * 2 + 1, sticky="w",
+                          padx=(4, 16), pady=(6, 0))
 
         control = ttk.LabelFrame(root, text="Motion control", padding=8)
         control.grid(row=2, column=0, sticky="ew", pady=(8, 0))
@@ -644,6 +670,22 @@ class Console(tk.Tk):
         self.metrics["trajectory"].set(
             f"{self.trajectory_x:.2f}, {self.trajectory_y:.2f}")
 
+    def display_pose(self, frame: NavPoseTelemetry) -> None:
+        """接收车端位姿帧：更新读数，并把轨迹点追加给轨迹图。
+
+        valid 的 bit0 为 0 表示车端此刻没有可信位姿（还没定原点，或位姿
+        超时），此时显示 "--" 并且不往轨迹里加点，避免画出一条假的线。
+        """
+        self.latest_pose = frame
+        if not frame.valid & POSE_VALID_DATA:
+            self.metrics["pose"].set("--")
+            self.metrics["pose_path"].set("--")
+            return
+        self.metrics["pose"].set(f"{frame.x_m:.2f}, {frame.y_m:.2f}")
+        self.metrics["pose_path"].set(f"{frame.path_length_m:.2f}")
+        self.vehicle_pose_points.append((frame.x_m, frame.y_m))
+        self._draw_trajectory()
+
     def reset_history(self) -> None:
         self.samples.clear()
         self.history_start_s = None
@@ -653,6 +695,8 @@ class Console(tk.Tk):
     def reset_trajectory(self) -> None:
         self.trajectory_points.clear()
         self.trajectory_points.append((0.0, 0.0))
+        self.vehicle_pose_points.clear()
+        self.vehicle_pose_points.append((0.0, 0.0))
         self.trajectory_x = 0.0
         self.trajectory_y = 0.0
         self.last_trajectory_uptime_ms = None
@@ -714,15 +758,28 @@ class Console(tk.Tk):
             return
         axis = self.trajectory_axis
         axis.clear()
+        # 蓝色：主机端用遥测里的轮速和 yaw 自己积分出来的轨迹
         x_values = [point[0] for point in self.trajectory_points]
         y_values = [point[1] for point in self.trajectory_points]
         axis.plot(x_values, y_values, color="tab:blue", linewidth=1.8, label="fused path")
         axis.scatter([x_values[0]], [y_values[0]], color="tab:green", label="start")
         axis.scatter([x_values[-1]], [y_values[-1]], color="tab:red", label="current")
-        span = max(max(x_values) - min(x_values), max(y_values) - min(y_values), 1.0)
+        # 橙色：车端算出来的位姿。两条线应该基本重合；分开的方向能提示原因：
+        # 整体偏短是轮径/计数标定误差，越走越散是 yaw 漂移，转弯处突然甩开是打滑。
+        pose_x = [point[0] for point in self.vehicle_pose_points]
+        pose_y = [point[1] for point in self.vehicle_pose_points]
+        if len(pose_x) > 1:
+            axis.plot(pose_x, pose_y, color="tab:orange", linewidth=1.8,
+                      label="vehicle pose")
+            axis.scatter([pose_x[-1]], [pose_y[-1]], color="tab:orange",
+                         marker="x", label="vehicle pose now")
+        # 坐标范围要同时容纳两条线，否则车端曲线会被裁掉
+        all_x = x_values + pose_x
+        all_y = y_values + pose_y
+        span = max(max(all_x) - min(all_x), max(all_y) - min(all_y), 1.0)
         margin = max(0.25, span * 0.15)
-        axis.set_xlim(min(x_values) - margin, max(x_values) + margin)
-        axis.set_ylim(min(y_values) - margin, max(y_values) + margin)
+        axis.set_xlim(min(all_x) - margin, max(all_x) + margin)
+        axis.set_ylim(min(all_y) - margin, max(all_y) + margin)
         axis.set_aspect("equal", adjustable="box")
         axis.set_xlabel("Body +X forward (m)")
         axis.set_ylabel("Body +Y left (m)")
@@ -738,8 +795,8 @@ class Console(tk.Tk):
         axis.text(arrow_length, 0.0, " +X", color="tab:red", va="bottom")
         axis.text(0.0, arrow_length, " +Y", color="tab:green", ha="left")
         scale = 0.5 if span < 5.0 else 1.0
-        x0 = min(x_values) - margin * 0.75
-        y0 = min(y_values) - margin * 0.75
+        x0 = min(all_x) - margin * 0.75
+        y0 = min(all_y) - margin * 0.75
         axis.plot([x0, x0 + scale], [y0, y0], color="black", linewidth=3)
         axis.text(x0 + scale * 0.5, y0 + margin * 0.12, f"{scale:g} m", ha="center")
         axis.legend(loc="upper right")
@@ -757,6 +814,9 @@ class Console(tk.Tk):
                 for frame in self.parser.feed(data):
                     if isinstance(frame, CalibrationTelemetry):
                         self.display_calibration(frame)
+                    elif isinstance(frame, NavPoseTelemetry):
+                        # 位姿帧和遥测帧共用帧头，靠帧类型区分，别走 display()
+                        self.display_pose(frame)
                     else:
                         self.display(frame)
                     self.last_frame_at = now

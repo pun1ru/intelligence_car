@@ -19,3 +19,36 @@
 - 变更：新增主机侧单元测试 `tests/host/odometry_test.c`，覆盖直线、左转、航向原点偏置、跨 ±180° 回绕、非法输入（空指针、非正 `dt`、NaN/Inf、无效轮距）与倒车。
 - 验证：`gcc -std=c99 -Wall -Wextra` 编译测试无告警，`25 checks, 0 failure(s)`。Keil `UV4 -b rt1064.uvprojx` 全量编译 `0 Error(s), 0 Warning(s)`，`Code=102952 RO-data=11392 RW-data=216 ZI-data=78616`（改动前为 `Code=99544 RO-data=11360 RW-data=216 ZI-data=78500`）。
 - 未解决：位姿未在实车验证，也未标定轮径/轮距比例误差与漂移速度；位姿只能通过内部接口读取，没有遥测或屏幕输出，车上无法直接观察；路径表与轨迹跟踪（Pure Pursuit）未实现；转向环 PID 输出 `±1000` 限幅导致大角度饱和的问题未处理（当前靠前馈提供主要转向力矩）。
+
+## 2026-10-12（下午：位姿可观测性）
+
+- 变更：车端新增 `0x82` 导航位姿上行帧（固定 18 字节：x、y、heading、累计里程、编码器推算角速度，`valid` bit0 位姿有效、bit1 处于导航）。沿用同一帧头、版本、序号与 CRC，52 字节遥测帧与 24 字节校准帧未改动，因此不破坏既有解析。`app_serial` 新增 `app_serial_encode_pose`/`app_serial_send_pose`，`send_task` 每 100 ms 在遥测帧之后发送一帧，位姿来自 `decision_task_get_pose`。
+- 变更：上位机 `protocol.py` 增加 `NavPoseTelemetry` 与 `decode_nav_pose`，解析器改为按帧类型查表取帧长与解码函数；`main.py` 在轨迹图上把车端位姿（橙色）与主机端推算（蓝色）叠加显示，新增“Vehicle pose (x, y)”与“Vehicle path length”读数；同时把面板里过期的默认 PID 数值改为与固件一致（速度环 `Kp=24`、转向环 `Kp=30`）。
+- 变更：位姿积分时机从“仅导航状态”改为“上电后第一个有效姿态样本起持续积分”，进入导航时重新确定原点、退出导航后保留最后位姿；校准模式不积分且退出校准时重置原点（轮速台架测试会让轮子空转数米，否则会被记成一次位移）。这样在上电、保护或平衡状态下都能手推车辆核对里程标定，不必先把车立起来进入导航。
+- 验证：`python -m py_compile` 通过；`python -m unittest test_protocol` 5 项通过，含 C 端编码字节与 Python 解码的交叉核对用例——`tests/host/pose_frame_dump.c` 用固件里的 `app_serial_encode_pose` 生成 `5aa5018203032efb37022823290983ff5d74`，与 Python 手工构造的帧逐字节相同，解码值一致。Keil 全量编译 `0 Error(s), 0 Warning(s)`，`Code=103624 RO-data=11392 RW-data=216 ZI-data=78616`。
+- 验证：`tests/host/odometry_test.c` 25 项检查通过。
+- 未解决：位姿帧本身未在实车链路上核对（需要烧录后接上位机确认）；位姿准确度与漂移仍未标定；路径表与轨迹跟踪（Pure Pursuit）未实现。
+
+## 2026-10-12（补注释）
+
+- 变更：为本次新增和改动的代码补充中文注释，便于队友直接阅读：`odometry.h/.c`、`app_pose.h/.c`、`decision_task.h/.c`、`app_serial.h/.c`（位姿帧部分）、`send_task.c`、`receive_task.h/.c`（快照接口）、`general_define.h`（位姿帧宏与写回的增益值）、`tests/host/*.c`、`upper/protocol.py`、`upper/main.py`、`upper/test_protocol.py`。注释语言遵循仓库既有做法（`kalman`、`EKF`、`madgwick` 本来就用中文注释），标识符保持英文。
+- 变更：`C_CODE_STYLE.md` 明确新增源码保存为 UTF-8 无 BOM（含中文注释时同样，不用 GBK），并补充注释语言与文件头说明的建议。
+- 验证：Keil 全量编译 `0 Error(s), 0 Warning(s)`，`Code=103624 RO-data=11392 RW-data=216 ZI-data=78616`，与加注释前逐字节相同，说明只改了注释；`tests/host/odometry_test.exe` 25 项通过；`tests/host/pose_frame_dump.exe` 输出的固定向量未变；`python -m py_compile` 与 `python -m unittest test_protocol`（5 项）通过。已核对全部改动文件为合法 UTF-8 且无 BOM。
+- 未解决：无新增；此前关于实车验证、标定与路径跟踪的待办不变。
+
+## 2026-10-12（上位机读数被裁）
+
+- 问题：位姿读数在 Live values 里看不到。实测确认不是版本问题（运行中的窗口标题带有版本标记、进程命令行为 `python.exe main.py`），而是**布局裁剪**：窗口内容实测需要约 1020 px，默认窗口仅 820 px，而 `main.py` 中只有 Notebook 所在行设置了 `weight=1`，窗口偏矮时全部压缩都由 Notebook 承担，Live values 的两个读数框因此只分到 240 px，超出部分被父框裁掉。
+- 影响范围：不只新增的两行。逐层裁剪检查显示，改动前的最后一行 `Trajectory`，以及左栏的 `cal_status`、`bias_x`、`bias_y`、`bias_z`、`cal_samples`（校准读数）同样一直不可见。
+- 变更：`Vehicle pose (x, y)` 与 `Vehicle path length` 移到窗口顶部 `Vehicle state` 框（该框按内容取高，不会被压缩）；窗口默认几何由 `1180x820` 改为 `1180x1000`；窗口标题加入 `UI_VERSION` 标记，便于区分多份仓库副本与旧进程。
+- 验证：用脚本逐层比对每个读数与其父控件的高度，`pose`、`pose_path`、`roll`、`cal_samples`、`bias_z`、`trajectory`、`target_pitch`、`left_speed` 均为 VISIBLE。另外把一帧真实 0x82 数据喂给界面，读数正确显示为 `-1.23, 0.57` 与 `2.35`，轨迹点正常追加；`python -m py_compile` 通过。未在实车链路上复测。
+- 未解决：位姿帧的实车链路验证与里程标定仍待完成。
+
+## 2026-10-14
+
+- 实车（台架）验证：在保护状态下手推车辆，格子实测 92 cm，上位机 `Vehicle path length` 读数 0.92（当时朝车尾方向推，故为负号），比例误差约 0.1%。结论：`WHEEL_ENCODER_COUNTS_PER_REV`（2321.07）与轮径常数可用，不需要修正；此前担心的 1.2% 偏差没有出现。位姿帧（0x82）在无线链路上收发正常，上位机读数与轨迹曲线均已可见。
+- 变更：新增轨迹跟踪的算法与路径表。`myAlgorithm/path_tracking/pure_pursuit` 实现 Pure Pursuit：先找最近点，再沿路径量取前视距离得到前视点，由前视点方向给出目标航向，并按曲率估计把速度在上限与下限之间缩放；输出还包含横向偏差与前视点序号便于调试。`myApplication/navigation/app_nav_path` 为锥桶间隙点表（相对发车点、+X 向前、+Y 向左），当前为空表并附填表说明与示例，`app_nav_path_count()` 返回 0。
+- 变更：新增主机侧测试 `tests/host/pure_pursuit_test.c`（29 项），覆盖直线跟踪、横向偏差左右符号、急弯减速、终点判定、前视点只前进不后退、单点路径、车压在前视点上的退化情形与非法输入。算法实现中特意把前视距离改为"沿路径量取"而不是"车到点的直线距离"——后者在车略微越过最近点时会算出要求倒退的航向。
+- 变更：两个新模块加入 `rt1064.uvprojx` 的分组与 include path；文档同步（`ARCHITECTURE.md` 说明模块未接入控制环、`TODO_LIST.md` 更新路径表示与跟踪接入两项、`C_CODE_STYLE.md` 前一日已补编码约定）。
+- 验证：`gcc -std=c99 -Wall -Wextra` 编译无告警，`pure_pursuit_test` 29 项、`odometry_test` 25 项全部通过。Keil 全量编译 `0 Error(s), 0 Warning(s)`，`Code=103624` 与加注释前一致——新模块尚无调用者，链接器未将其纳入固件，车的现有行为未改变。
+- 未解决：路径表尚未填入实际锥桶坐标；Pure Pursuit 尚未接入控制环（需要换算到 IMU 航向坐标系、定前视距离与速度上下限、并加"总开关与安全退出"策略）；位姿的航向积分与转向符号尚未做方框闭合验证。

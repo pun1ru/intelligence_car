@@ -14,6 +14,8 @@ void receive_task(void *pvParameters);
 uint8_t receive_data_init(void);
 uint8_t receive_imu_snapshot(app_imu_sample_t *sample);
 uint8_t receive_attitude_snapshot(app_attitude_t *attitude);
+/* 读最新的绝对编码器计数快照（16 位，会回绕，调用方自己做差分）。
+ * 不取走数据，可被多个任务同时读。 */
 uint8_t receive_encoder_snapshot(app_encoder_sample_t *encoder);
 uint8_t receive_display_snapshot(app_attitude_t *attitude,
                                  app_encoder_sample_t *encoder);

@@ -84,6 +84,7 @@ uint8_t receive_attitude_snapshot(app_attitude_t *attitude)
             pdMS_TO_TICKS(VEHICLE_ATTITUDE_TIMEOUT_MS)) ? 1U : 0U;
 }
 
+/* 只读快照，不消费队列里的数据：显示、位姿和控制链各读各的，互不影响。 */
 uint8_t receive_encoder_snapshot(app_encoder_sample_t *encoder)
 {
     if ((encoder == NULL) || (encoder_queue == NULL))

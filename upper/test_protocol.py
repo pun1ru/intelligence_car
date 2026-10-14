@@ -2,9 +2,10 @@ import struct
 import unittest
 
 from protocol import (
-    BALANCE, FEEDFORWARD, MOTION, PID_BASE, STATE, STEERING_FEEDFORWARD,
-    SUPPORT, TELEMETRY_LENGTH, TelemetryParser, command_frame, crc16,
-    decode_telemetry, feedforward_frame, pid_frame,
+    BALANCE, FEEDFORWARD, MOTION, NAV_POSE_LENGTH, NAV_POSE_TYPE, PID_BASE,
+    POSE_VALID_DATA, POSE_VALID_NAVIGATION, STATE, STEERING_FEEDFORWARD,
+    SUPPORT, TELEMETRY_LENGTH, NavPoseTelemetry, TelemetryParser, command_frame,
+    crc16, decode_nav_pose, decode_telemetry, feedforward_frame, pid_frame,
     steering_feedforward_frame,
 )
 
@@ -21,6 +22,21 @@ def sample_frame() -> bytes:
     struct.pack_into("<h", frame, 44, 250)
     struct.pack_into("<H", frame, 50, crc16(frame[:50]))
     return bytes(frame)
+
+
+def sample_pose_frame() -> bytes:
+    frame = bytearray(NAV_POSE_LENGTH)
+    frame[:6] = bytes((0x5A, 0xA5, 1, NAV_POSE_TYPE, 3,
+                       POSE_VALID_DATA | POSE_VALID_NAVIGATION))
+    struct.pack_into("<5h", frame, 6, -1234, 567, 9000, 2345, -125)
+    struct.pack_into("<H", frame, 16, crc16(frame[:16]))
+    return bytes(frame)
+
+
+# 固定向量：由车端编码器本人产出（tests/host/pose_frame_dump.c 调用
+# app_serial_encode_pose 打印出来的字节）。这样"C 端怎么填帧"和
+# "Python 怎么解帧"就不会各改各的而没人发现。
+VEHICLE_POSE_FRAME = bytes.fromhex("5aa5018203032efb37022823290983ff5d74")
 
 
 class ProtocolTest(unittest.TestCase):
@@ -65,6 +81,45 @@ class ProtocolTest(unittest.TestCase):
         frame[16] ^= 1
         with self.assertRaises(ValueError):
             decode_telemetry(frame)
+
+    def test_nav_pose_round_trip_and_interleaving(self):
+        # 先确认解码结果和写入的物理量一致（缩放、符号、字节序）
+        pose = sample_pose_frame()
+        decoded = decode_nav_pose(pose)
+        self.assertEqual((decoded.x_m, decoded.y_m), (-1.234, 0.567))
+        self.assertEqual(decoded.heading_deg, 90.0)
+        self.assertEqual(decoded.path_length_m, 2.345)
+        self.assertEqual(decoded.yaw_rate_rad_s, -0.125)
+        self.assertEqual(decoded.valid, POSE_VALID_DATA | POSE_VALID_NAVIGATION)
+
+        # 车端是把三种帧连着发出来的，所以解析器必须能在一段字节流里按类型
+        # 各自切帧——这是实际链路上最容易出错的地方。
+        parser = TelemetryParser()
+        frames = parser.feed(sample_frame() + pose + sample_frame())
+        self.assertEqual(len(frames), 3)
+        self.assertIsInstance(frames[1], NavPoseTelemetry)
+        self.assertEqual(frames[1], decoded)
+        self.assertEqual(parser.bad_frames, 0)
+
+        # 数据位被改动（CRC 对不上）时应当丢弃这一帧并重新同步，
+        # 而不是把它当成遥测帧，也不能因此丢掉后面的好帧。
+        damaged = bytearray(pose)
+        damaged[8] ^= 1
+        parser = TelemetryParser()
+        self.assertEqual(parser.feed(bytes(damaged) + pose), [decoded])
+        self.assertEqual(parser.bad_frames, 1)
+
+    def test_vehicle_encoder_matches_decoder(self):
+        # 用固件产出的真实字节验证解码，防止两边布局悄悄跑偏
+        decoded = decode_nav_pose(VEHICLE_POSE_FRAME)
+        self.assertEqual(decoded.x_m, -1.234)
+        self.assertEqual(decoded.y_m, 0.567)
+        self.assertEqual(decoded.heading_deg, 90.0)
+        self.assertEqual(decoded.path_length_m, 2.345)
+        self.assertEqual(decoded.yaw_rate_rad_s, -0.125)
+        self.assertEqual(decoded.valid,
+                         POSE_VALID_DATA | POSE_VALID_NAVIGATION)
+        self.assertEqual(sample_pose_frame(), VEHICLE_POSE_FRAME)
 
 
 if __name__ == "__main__":

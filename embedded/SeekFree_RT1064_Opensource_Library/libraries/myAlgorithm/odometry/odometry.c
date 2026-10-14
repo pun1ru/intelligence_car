@@ -2,8 +2,14 @@
 
 #include <math.h>
 
-/* Relative heading stays inside +/-pi so that crossing the yaw boundary takes
- * the short way round, matching the steering loop in app_balance.c. */
+/*
+ * odometry 实现：见 odometry.h 开头的说明。
+ * 这里的四个函数都只依赖入参和自身状态，同样的输入必然得到同样的输出，
+ * 便于在电脑上做单元测试。
+ */
+
+/* 把角度收进 [-pi, pi]，这样跨越 yaw 边界时走短边，
+ * 和 app_balance.c 里转向环 wrap_angle_deg 的处理保持一致。 */
 static float odometry_wrap_pi(float angle_rad)
 {
     while (angle_rad > ODOMETRY_PI_F)
@@ -29,6 +35,8 @@ void odometry_init(odometry_t *odometry, float track_width_m)
         return;
     }
 
+    /* 先整体清零，再只在轮距合法时写入；轮距非法时保持 origin_set = 0，
+     * 后面 odometry_reset / odometry_step 都会拒绝工作，避免拿错几何算出假位姿。 */
     *odometry = (odometry_t){0};
     if (isfinite(track_width_m) && (track_width_m > 0.0f))
     {
@@ -38,6 +46,7 @@ void odometry_init(odometry_t *odometry, float track_width_m)
 
 void odometry_reset(odometry_t *odometry, float yaw_rad)
 {
+    /* track_width_m <= 0 说明 odometry_init 没拿到合法轮距，此时拒绝定原点 */
     if ((odometry == 0) || (odometry->track_width_m <= 0.0f) ||
         !isfinite(yaw_rad))
     {
@@ -46,6 +55,7 @@ void odometry_reset(odometry_t *odometry, float yaw_rad)
 
     odometry->x_m = 0.0f;
     odometry->y_m = 0.0f;
+    /* 原点航向就是此刻的车头方向，所以相对航向从 0 开始 */
     odometry->heading_rad = 0.0f;
     odometry->path_length_m = 0.0f;
     odometry->yaw_rate_rad_s = 0.0f;
@@ -66,13 +76,15 @@ uint8_t odometry_step(odometry_t *odometry, float dt_s, float left_delta_m,
         return 0U;
     }
 
-    /* Differential drive: the right wheel leads on a left (positive) turn. */
+    /* 差速轮：左转（航向正方向）时右轮比左轮走得远，所以右减左。
+     * track_width_m 已在 odometry_init 里校验为正数。 */
     odometry->yaw_rate_rad_s = (right_delta_m - left_delta_m) /
                                (odometry->track_width_m * dt_s);
 
-    /* Use the measured heading rather than the integrated one; the yaw source
-     * carries the absolute direction and the encoders only supply travel. */
+    /* 航向直接取姿态解输出的 yaw（减去原点航向），不用编码器积分：
+     * yaw 提供方向，编码器只提供走了多远，二者分工明确。 */
     heading_rad = odometry_wrap_pi(yaw_rad - odometry->yaw_offset_rad);
+    /* 后轮轴向平均：左右轮行程的均值就是车体中心的前进距离 */
     delta_m = 0.5f * (left_delta_m + right_delta_m);
 
     odometry->x_m += delta_m * cosf(heading_rad);

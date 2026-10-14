@@ -7,9 +7,14 @@
 #define APP_POSE_RAD_PER_DEG (ODOMETRY_PI_F / 180.0f)
 #define APP_POSE_DEG_PER_RAD (180.0f / ODOMETRY_PI_F)
 
-/* Wheel travel produced by one encoder count, from the geometry in
- * general_define.h.  Integrating counts rather than speed keeps the travelled
- * distance independent of the sampling interval. */
+/*
+ * app_pose 实现：见 app_pose.h 开头的说明。
+ * 注意这里对计数积分、而不是对速度积分：速度 = 计数/dt，一旦调度抖动
+ * dt 就不准；直接累加计数则里程与采样间隔无关，只有角速度诊断量会被 dt 影响。
+ */
+
+/* 一个编码器计数对应多少米轮面行程：
+ * 每计数弧度 = 2*pi / 每圈计数，再乘轮半径。计数与轮径取自 general_define.h。 */
 static float app_pose_metres_per_count(void)
 {
     return WHEEL_TWO_PI_RAD / WHEEL_ENCODER_COUNTS_PER_REV * WHEEL_RADIUS_M;
@@ -23,6 +28,7 @@ void app_pose_init(app_pose_state_t *state)
     }
 
     app_encoder_tracker_reset(&state->wheel_tracker);
+    /* 轮距从 general_define.h 取；odometry_init 会校验合法性 */
     odometry_init(&state->odometry, WHEEL_TRACK_M);
     state->pose = (app_pose_t){0};
 }
@@ -35,6 +41,7 @@ void app_pose_reset(app_pose_state_t *state)
     }
 
     app_encoder_tracker_reset(&state->wheel_tracker);
+    /* 重新 init 就顺带清掉了 origin_set，位姿随之失效 */
     odometry_init(&state->odometry, WHEEL_TRACK_M);
     state->pose = (app_pose_t){0};
 }
@@ -49,6 +56,7 @@ void app_pose_set_origin(app_pose_state_t *state, float yaw_deg)
     app_encoder_tracker_reset(&state->wheel_tracker);
     odometry_reset(&state->odometry, yaw_deg * APP_POSE_RAD_PER_DEG);
     state->pose = (app_pose_t){0};
+    /* 只有真正定上了原点，才把位姿标为可信 */
     state->pose.valid = state->odometry.origin_set;
 }
 
@@ -67,19 +75,23 @@ uint8_t app_pose_step(app_pose_state_t *state,
     if (app_encoder_tracker_step(&state->wheel_tracker, encoder, dt_s,
                                  &motion) == 0U)
     {
-        /* The first snapshot after a reset only records the baseline count. */
+        /* reset / set_origin 之后的第一帧只记录基线，差分不出增量 */
         return 0U;
     }
 
+    /* 左右轮有各自的计数符号（WHEEL_*_COUNT_SIGN），motion 里的 delta_count
+     * 已经统一成"前进为正"，所以这里直接乘即可，不需要再判方向。 */
     metres_per_count = app_pose_metres_per_count();
     if (odometry_step(&state->odometry, dt_s,
                       (float)motion.left.delta_count * metres_per_count,
                       (float)motion.right.delta_count * metres_per_count,
                       yaw_deg * APP_POSE_RAD_PER_DEG) == 0U)
     {
+        /* 参数不合法或还没定原点：保持上一次的位姿不动 */
         return 0U;
     }
 
+    /* 把算法层的弧度/内部状态翻译成对外发布的位姿 */
     state->pose.x_m = state->odometry.x_m;
     state->pose.y_m = state->odometry.y_m;
     state->pose.heading_deg = state->odometry.heading_rad * APP_POSE_DEG_PER_RAD;

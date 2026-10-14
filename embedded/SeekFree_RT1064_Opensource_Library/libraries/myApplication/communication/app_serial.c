@@ -44,6 +44,27 @@ static void put_scaled(uint8_t *frame, uint8_t offset, float value, float scale)
     put_u16(frame, offset, (uint16_t)(int16_t)rounded);
 }
 
+/* 计算并填入 CRC-16/CCITT-FALSE（覆盖 frame[0..length-3]）。
+ * 遥测帧和校准帧里各写了一遍同样的循环，这里抽出来给新帧用。 */
+static void put_crc(uint8_t *frame, uint8_t length)
+{
+    uint16_t crc = SERIAL_TELEMETRY_CRC_INIT;
+    uint8_t index;
+    uint8_t bit;
+
+    for (index = 0U; index < length - 2U; index++)
+    {
+        crc ^= (uint16_t)frame[index] << 8U;
+        for (bit = 0U; bit < 8U; bit++)
+        {
+            crc = (crc & 0x8000U) ?
+                (uint16_t)((crc << 1U) ^ SERIAL_TELEMETRY_CRC_POLY) :
+                (uint16_t)(crc << 1U);
+        }
+    }
+    put_u16(frame, length - 2U, crc);
+}
+
 uint8_t app_serial_encode_telemetry(const app_serial_telemetry_t *data,
                                     uint8_t sequence,
                                     uint8_t frame[SERIAL_TELEMETRY_LENGTH])
@@ -326,6 +347,45 @@ void app_serial_send_calibration(const app_serial_calibration_t *calibration)
 
     if (app_serial_encode_calibration(calibration, telemetry_sequence,
                                       frame) != 0U)
+    {
+        drv_io_uart_write(frame, sizeof(frame));
+        telemetry_sequence++;
+    }
+}
+
+uint8_t app_serial_encode_pose(const app_serial_pose_t *pose, uint8_t sequence,
+                               uint8_t frame[SERIAL_NAV_POSE_LENGTH])
+{
+    if ((pose == NULL) || (frame == NULL))
+    {
+        return 0U;
+    }
+    /* 布局见 docs/SERIAL_PROTOCOL.md 的 0x82 帧表。前两字节与遥测帧相同，
+     * 但帧头之后的 type 不同，所以上位机按 type 分帧解析。
+     * 数值统一走 put_scaled：内部做非有限值过滤、饱和到 int16、四舍五入。 */
+    frame[0] = SERIAL_TELEMETRY_SYNC_0;
+    frame[1] = SERIAL_TELEMETRY_SYNC_1;
+    frame[2] = SERIAL_TELEMETRY_VERSION;
+    frame[3] = SERIAL_NAV_POSE_TYPE;
+    frame[4] = sequence;
+    frame[5] = pose->valid;
+    put_scaled(frame, 6U, pose->x_m, SERIAL_POSE_POSITION_UNITS_PER_M);
+    put_scaled(frame, 8U, pose->y_m, SERIAL_POSE_POSITION_UNITS_PER_M);
+    put_scaled(frame, 10U, pose->heading_deg, SERIAL_ANGLE_UNITS_PER_DEG);
+    put_scaled(frame, 12U, pose->path_length_m,
+               SERIAL_POSE_POSITION_UNITS_PER_M);
+    put_scaled(frame, 14U, pose->yaw_rate_rad_s,
+               SERIAL_POSE_RATE_UNITS_PER_RAD_S);
+    put_crc(frame, SERIAL_NAV_POSE_LENGTH);
+    return 1U;
+}
+
+void app_serial_send_pose(const app_serial_pose_t *pose)
+{
+    uint8_t frame[SERIAL_NAV_POSE_LENGTH];
+
+    /* 序号只在真正把字节写出去后才自增，发送失败（参数为空）不占号 */
+    if (app_serial_encode_pose(pose, telemetry_sequence, frame) != 0U)
     {
         drv_io_uart_write(frame, sizeof(frame));
         telemetry_sequence++;

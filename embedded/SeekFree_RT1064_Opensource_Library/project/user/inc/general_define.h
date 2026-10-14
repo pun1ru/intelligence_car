@@ -98,9 +98,14 @@
 #define BALANCE_ANGLE_KP             600.0f
 #define BALANCE_ANGLE_KI             0.0f
 #define BALANCE_ANGLE_KD             30.0f
+/* 以下三组增益是上位机在线调好、再写回这里的值（2026-10-12），
+ * 目的是断电重启后不用重新调参。速度环与转向环的 Kp 曾用默认值 16 / 100。 */
 #define BALANCE_SPEED_KP             24.0f
 #define BALANCE_SPEED_KI             3.0f
 #define BALANCE_SPEED_KD             0.0f
+/* 转向环：PID 输出先限幅 ±BALANCE_STEERING_PWM_LIMIT(1000)，
+ * 再叠加前馈后与角度环一起按 ±BALANCE_ANGLE_PWM_LIMIT(3500) 限幅，
+ * 所以大角度转向主要靠 BALANCE_STEERING_FEEDFORWARD_PWM_PER_DEG。 */
 #define BALANCE_STEERING_KP          30.0f
 #define BALANCE_STEERING_KI          2.0f
 #define BALANCE_STEERING_KD          0.0f
@@ -192,6 +197,17 @@
 #define SERIAL_TELEMETRY_LENGTH      52U
 #define SERIAL_CALIBRATION_TYPE      0x81U
 #define SERIAL_CALIBRATION_LENGTH    24U
+/* 导航位姿单独用一种上行帧，这样 52 字节定长遥测帧一个字节都不用动，
+ * 旧固件/旧上位机仍能按原帧长解析。帧格式见 docs/SERIAL_PROTOCOL.md。 */
+#define SERIAL_NAV_POSE_TYPE         0x82U
+#define SERIAL_NAV_POSE_LENGTH       18U
+/* 位姿帧 valid 字节的位定义 */
+#define SERIAL_POSE_VALID_DATA       0x01U  /* 位姿已定原点并成功积分，数值可信 */
+#define SERIAL_POSE_VALID_NAVIGATION 0x02U  /* 发送时刻车辆处于导航状态 */
+/* 位姿帧各字段的定点缩放：位置用 0.001 m，角速度用 0.001 rad/s；
+ * 航向复用 SERIAL_ANGLE_UNITS_PER_DEG（0.01 deg）。 */
+#define SERIAL_POSE_POSITION_UNITS_PER_M  1000.0f
+#define SERIAL_POSE_RATE_UNITS_PER_RAD_S  1000.0f
 #define SERIAL_TELEMETRY_CRC_POLY    0x1021U
 #define SERIAL_TELEMETRY_CRC_INIT    0xFFFFU
 #define SERIAL_VALID_STATE           0x01U

@@ -46,6 +46,26 @@ PID 命令号为 `0x50 + controller * 3 + gain`。`controller=0` 轮速环，`1`
 | 50 | 2 | CRC16 | 小端 |
 
 编码器增量是最新一次采样值，不是 100 ms 遥测周期内的累计值。PWM 数值是已限幅的电机命令，正负号为工程定义的前进方向；不是实际测得的占空比。遥测没有加密或认证，控制链路应使用可信无线模块与物理隔离。上位机读取 CRC 错误或序号丢帧时只显示有效帧；500 ms 未收到有效遥测时显示超时。车辆保护以其下行命令超时逻辑为准。
+## 车到电脑：导航位姿帧
+
+位姿单独使用一种上行帧，固定 18 字节，与 52 字节遥测帧并存：同样的帧头、版本号、序号和 CRC 规则，因此旧固件与旧上位机仍按原有帧长解析，不受影响。车端每 100 ms 在遥测帧之后发送一帧。没有有效位时字段填零。
+
+| 偏移 | 长度 | 字段 | 单位/说明 |
+| --- | --- | --- | --- |
+| 0 | 2 | `5A A5` | 上行帧头 |
+| 2 | 1 | version=`01` | 协议版本 |
+| 3 | 1 | type=`82` | 导航位姿 |
+| 4 | 1 | sequence | 与遥测帧共用序号，逐帧加一 |
+| 5 | 1 | valid | bit0 位姿有效；bit1 当前处于导航状态 |
+| 6 | 2 | x | int16，0.001 m，机体 `+X` 向前 |
+| 8 | 2 | y | int16，0.001 m，机体 `+Y` 向左 |
+| 10 | 2 | heading | int16，0.01 deg，相对进入导航时的航向，范围 `[-180, 180]` |
+| 12 | 2 | path_length | int16，0.001 m，带符号累计行进里程 |
+| 14 | 2 | yaw_rate | int16，0.001 rad/s，由左右轮行程差推算的机体角速度 |
+| 16 | 2 | CRC16 | 小端，覆盖字节 0..15 |
+
+位姿原点在上电后第一个有效姿态样本时确定，并在进入导航状态时重设（见 [车体约定](VEHICLE_CONVENTIONS.md)），因此同一趟的 x/y 可以直接与上位机自身的推算轨迹叠在一起比较，也可以在上电或保护状态下手推车辆核对里程标定。`path_length` 与 x/y 分别反映里程标定误差和航向误差，便于把问题分开；`yaw_rate` 是编码器推算值，与 52 字节遥测帧中的 IMU yaw 速率互为校核，可用于判断车轮打滑或 yaw 漂移。
+
 ## Upper monitor additions
 
 Telemetry `valid` bit `0x20` reports the vehicle-side encoder speed anomaly or lift diagnostic. The fixed 52-byte frame is unchanged; the diagnostic does not itself enter protection. The upper monitor displays the flag with the vehicle state, offers four selectable realtime charts, and fuses signed wheel speed with measured yaw into a metre-scaled trajectory view. W/S sets configurable forward or reverse speed and A/D changes a wrapped yaw target; the vehicle controller follows the shortest angular error.
