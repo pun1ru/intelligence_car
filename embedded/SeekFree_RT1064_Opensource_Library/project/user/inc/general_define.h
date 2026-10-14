@@ -150,7 +150,7 @@
  *   0 = 只算不动：照常计算并上报导航指令，但控制环忽略它（车只原地平衡）。
  *       台架验证"路径 → 目标速度/航向"是否正确时用它，可以手推着车看数字，
  *       既不用怕车自己跑，也不用让电机和你抢方向盘。 */
-#define NAV_TRACKING_DRIVE_ENABLE    0U
+#define NAV_TRACKING_DRIVE_ENABLE    1U
 #define NAV_TRACKING_LOOKAHEAD_M     0.40f
 /* 第一次上车试跑用的保守值：先确认"能走直、能跟着弯、到点能停"，
  * 确认无误后再往上加（上限受 BALANCE_SPEED_TARGET_MAX_MPS 约束）。 */
