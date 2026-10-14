@@ -118,3 +118,13 @@
 - 变更：路径表暂时填入**示例 S 形路径**（`APP_NAV_PATH_DEFINED = 1`，注释里写明比赛前必须整体替换）；`general_define.h` 新增 `NAV_TRACKING_ENABLE_DEFAULT`（当前 1，供本轮台架验证）与前视距离/速度上下限等参数。**电机仍然不受影响**：本轮的指令只用于显示，`app_control` 还没有消费它。
 - 验证：Keil 全量编译 `0 Error(s), 0 Warning(s)`，`Code=103936 -> 106904`；`tests/host/pure_pursuit_test` 29 项、`odometry_test` 25 项通过；`python -m unittest test_protocol` 6 项通过，其中固定向量 `5aa5018203072efb37022823290983ffc2012efbb0ff03ac53` 由车端编码器本人生成，确认 C 端与 Python 端 25 字节布局一致。界面用构造帧验证：带 bit2 显示 `Nav: on …`，不带则显示 `Nav: off`。
 - 未解决：指令尚未驱动电机；`NAV_TRACKING_ENABLE_DEFAULT` 与示例路径都还没换成比赛值；位姿的台阶测试仍待做。
+
+## 2026-10-14（路径跟踪接入控制环：车开始能自己跟路线走）
+
+- 变更：`app_control_step` 增加第三个参数 `const app_nav_command_t *nav`，接管规则写进函数里——只有"导航状态 + 指令有效"时用跟踪的目标速度/航向替换状态机里的值并**强制打开转向环**，其余情况（未进导航、位姿不可信、路径表为空、支撑状态）一律回退到状态机的目标值（导航状态下默认是 0，即原地平衡）。`control_task` 负责取 `decision_task_get_nav()` 的快照并传入。
+- 变更：安全行为刻意选择"松手保持"而非"进保护"——定位失效时车继续原地平衡、不再跟路线；姿态失效/跌倒/串口失联仍由原有保护逻辑接管（保护会直接断电，平衡车会摔倒，不适合用来处理位姿故障）。
+- 变更：`app_nav` 增加终点处理：`pure_pursuit` 判定到点后把目标速度压到 0、航向保持路径末段方向，车停在原地保持平衡而不是继续前冲。
+- 变更：遥测帧 44/46 偏移的目标速度/目标 Yaw 改为报"控制环实际跟随的值"（来自 `app_control_telemetry_t` 的新字段 `effective_speed_m_s`/`effective_yaw_deg`/`nav_active`），需要 bit4 而不是 bit0。否则跟路线时上位机会看到两个 0，误以为车停了。
+- 变更：为第一次上车安全起见，示例路径放缓（±0.15 m 摆动、点间距 0.9 m），`NAV_TRACKING_SPEED_MAX_M_S` 由 0.60 降到 0.40。
+- 验证：Keil 全量编译 `0 Error(s), 0 Warning(s)`，`Code=106904 -> 107400`；`pure_pursuit_test` 29 项、`odometry_test` 25 项、`python -m unittest test_protocol` 6 项全部通过。**未实车验证**。
+- 未解决：实车试跑与调参（前视距离、速度上下限）；路径表仍是示例坐标；`NAV_TRACKING_ENABLE_DEFAULT` 比赛前需确认为 1（当前已是 1）；位姿台阶测试仍待做。

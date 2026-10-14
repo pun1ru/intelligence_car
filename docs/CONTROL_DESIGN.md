@@ -42,6 +42,21 @@ angle loop output to `BALANCE_ANGLE_PWM_LIMIT = 3500`. A large Yaw error is
 therefore dominated by the feedforward term rather than by the proportional
 gain.
 
+## 路径跟踪如何接管控制（导航状态）
+
+跟踪指令由 `decision_task` 每 10 ms 更新（`app_nav`：位姿 + 路径表 → 目标速度与
+目标航向），`control_task` 每 5 ms 取快照传给 `app_control_step`。接管规则如下：
+
+| 条件 | 控制环跟随的目标 | 转向环 |
+| --- | --- | --- |
+| 导航状态且指令有效（`active`） | 路径跟踪的目标速度/航向 | 强制打开 |
+| 其他任何情况（未进导航、位姿不可信、路径表为空、支撑状态…） | 状态机里的目标值；导航状态下默认是 0 | 按状态机设置 |
+
+安全行为刻意选择"松手保持"而不是"进保护"：**定位失效时车继续原地平衡，只是不再
+跟着路线走**（保护会直接断电，平衡车会摔倒）。姿态失效、跌倒、串口失联仍由原有
+保护逻辑接管。走到路径终点后 `app_nav` 把目标速度压到 0、航向保持路径末段方向，
+车会停在原地保持平衡，而不是继续往前冲。
+
 Support mode forces the steering loop off and clears its integral. When Support
 returns to Balance, the state task seeds the target Yaw from the current measured
 Yaw. The speed loop default Kp is `24`; its pitch target limit is asymmetric:

@@ -212,7 +212,8 @@ static uint16_t test_duty(int32_t pwm)
 }
 
 uint8_t app_control_step(const app_state_t *state,
-                         const app_attitude_t *attitude)
+                         const app_attitude_t *attitude,
+                         const app_nav_command_t *nav)
 {
     app_encoder_sample_t counts;
     app_encoder_motion_t motion = {0};
@@ -222,6 +223,11 @@ uint8_t app_control_step(const app_state_t *state,
     uint8_t test_enabled;
     uint8_t left_pressed;
     uint8_t right_pressed;
+    /* 只有"正处于导航状态 + 收到有效跟踪指令"才让领航员接管，其余情况一律回到
+     * 状态机的目标值（导航状态下默认是 0，也就是原地平衡，不会乱跑）。 */
+    uint8_t nav_used = 0U;
+    float effective_speed_m_s;
+    float effective_yaw_deg;
 
     if (wheel_test_initialized == 0U)
     {
@@ -229,6 +235,16 @@ uint8_t app_control_step(const app_state_t *state,
         app_balance_init(&angle_control);
         wheel_test_initialized = 1U;
     }
+
+    /* 先按"没有跟踪"填一遍实际目标值，下面真正跟路线时再覆盖；
+     * 这样保护、校准、台架测试这些提前返回的分支也不会把旧值留在遥测里。 */
+    control_telemetry.nav_active = 0U;
+    control_telemetry.effective_speed_m_s =
+        ((state != NULL) && isfinite(state->target_speed_m_s)) ?
+        state->target_speed_m_s : 0.0f;
+    control_telemetry.effective_yaw_deg =
+        ((state != NULL) && isfinite(state->target_yaw_deg)) ?
+        state->target_yaw_deg : 0.0f;
 
     wheel_elapsed_ms += CONTROL_TASK_PERIOD_MS;
     if (wheel_elapsed_ms >= WHEEL_SPEED_LOOP_PERIOD_MS)
@@ -353,14 +369,27 @@ uint8_t app_control_step(const app_state_t *state,
                                       state->wheel_feedforward_gain);
     app_balance_set_steering_feedforward(&angle_control,
                                          state->steering_feedforward_gain);
+
+    nav_used = ((nav != NULL) && (nav->active != 0U) &&
+                (state->vehicle_mode == APP_VEHICLE_NAVIGATION)) ? 1U : 0U;
+    effective_speed_m_s = (nav_used != 0U) ? nav->target_speed_m_s :
+                          state->target_speed_m_s;
+    effective_yaw_deg = (nav_used != 0U) ? nav->target_yaw_deg :
+                        state->target_yaw_deg;
+    /* 跟路线时必须开转向环，否则目标航向根本没人执行；支撑状态永远不开 */
     app_balance_set_steering_enabled(&angle_control,
-        (state->vehicle_mode == APP_VEHICLE_SUPPORT) ?
-        0U : state->steering_enabled);
-    app_balance_step(&angle_control, 1U, state->target_speed_m_s,
+        (nav_used != 0U) ? 1U :
+        ((state->vehicle_mode == APP_VEHICLE_SUPPORT) ?
+         0U : state->steering_enabled));
+    app_balance_step(&angle_control, 1U, effective_speed_m_s,
                      attitude->pitch, attitude->pitch_rate_dps,
                      speed_left_m_s, speed_right_m_s,
-                     state->target_yaw_deg, attitude->yaw,
+                     effective_yaw_deg, attitude->yaw,
                      attitude->yaw_rate_dps, &output);
+    /* 记下"控制环实际跟着的目标"，遥测用它；否则跟路线时上位机看到的还是 0 */
+    control_telemetry.nav_active = nav_used;
+    control_telemetry.effective_speed_m_s = effective_speed_m_s;
+    control_telemetry.effective_yaw_deg = effective_yaw_deg;
     app_balance_apply(&output);
     return 0U;
 }

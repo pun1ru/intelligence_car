@@ -1,6 +1,7 @@
 #include "control_task.h"
 
 #include "app_control.h"
+#include "decision_task.h"
 #include "general_define.h"
 #include "receive_task.h"
 #include "state_task.h"
@@ -47,10 +48,14 @@ void control_task(void *pvParameters)
     {
         app_state_t state;
         app_attitude_t attitude;
+        app_nav_command_t nav;
         const app_state_t *state_snapshot =
             (state_task_get_snapshot(&state) != 0U) ? &state : NULL;
         const app_attitude_t *attitude_snapshot =
             (receive_attitude_snapshot(&attitude) != 0U) ? &attitude : NULL;
+        /* 路径跟踪指令由 decision_task 维护；取不到快照就当作"没有跟踪" */
+        const app_nav_command_t *nav_snapshot =
+            (decision_task_get_nav(&nav) != 0U) ? &nav : NULL;
         uint32_t metric_start = task_metrics_begin();
         if ((state_snapshot != NULL) &&
             (state_snapshot->pid_update_requested != 0U))
@@ -70,7 +75,8 @@ void control_task(void *pvParameters)
                 (state_snapshot->vehicle_mode == APP_VEHICLE_SUPPORT) ?
                 0U : state_snapshot->steering_enabled);
         }
-        if (app_control_step(state_snapshot, attitude_snapshot) != 0U)
+        if (app_control_step(state_snapshot, attitude_snapshot,
+                             nav_snapshot) != 0U)
         {
             state_task_request_protection();
         }

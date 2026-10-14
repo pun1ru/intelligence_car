@@ -60,8 +60,6 @@ void send_task(void *pvParameters)
                 telemetry.valid |= SERIAL_VALID_STATE;
                 telemetry.control_mode = (uint8_t)state.control_mode;
                 telemetry.vehicle_mode = (uint8_t)state.vehicle_mode;
-                telemetry.target_speed_m_s = state.target_speed_m_s;
-                telemetry.target_yaw_deg = state.target_yaw_deg;
             }
             if (receive_attitude_snapshot(&attitude) != 0U)
             {
@@ -89,6 +87,10 @@ void send_task(void *pvParameters)
                 telemetry.left_pwm = motion.left_pwm;
                 telemetry.right_pwm = motion.right_pwm;
                 telemetry.target_pitch_deg = motion.target_pitch_deg;
+                /* 目标速度/航向报"控制环实际跟着的值"：跟路线时是路径跟踪算出来的，
+                 * 否则是状态机里的。否则上位机在跟踪期间会看到两个 0，以为是停了。 */
+                telemetry.target_speed_m_s = motion.effective_speed_m_s;
+                telemetry.target_yaw_deg = motion.effective_yaw_deg;
                 if (motion.wheel_valid != 0U)
                 {
                     telemetry.valid |= SERIAL_VALID_MOTION;

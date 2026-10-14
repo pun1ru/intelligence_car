@@ -110,6 +110,24 @@ void app_nav_step(app_nav_state_t *state, const app_pose_t *pose)
         app_nav_wrap_deg(pose->yaw_offset_deg + output.target_heading_deg);
     state->command.cross_track_m = output.cross_track_m;
     state->command.target_index = output.target_index;
+
+    if (output.finished != 0U)
+    {
+        /* 到终点了：把目标速度压到 0，让车停在原地保持平衡，而不是继续往前冲。
+         * 航向仍保持"路径末段的方向"，这样它是停稳的、不是歪的。
+         * 末段方向由最后两个路径点算；路径只有 1 个点时保持当前朝向。 */
+        state->command.target_speed_m_s = 0.0f;
+        if (count >= 2U)
+        {
+            state->command.target_heading_deg = atan2f(
+                points[count - 1U].y_m - points[count - 2U].y_m,
+                points[count - 1U].x_m - points[count - 2U].x_m) *
+                57.29577951308232f;
+            state->command.target_yaw_deg =
+                app_nav_wrap_deg(pose->yaw_offset_deg +
+                                 state->command.target_heading_deg);
+        }
+    }
 }
 
 void app_nav_snapshot(const app_nav_state_t *state, app_nav_command_t *command)

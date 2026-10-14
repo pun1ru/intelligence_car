@@ -146,7 +146,9 @@
  * 定好（设 1），否则上位机没法把它打开。 */
 #define NAV_TRACKING_ENABLE_DEFAULT  1U
 #define NAV_TRACKING_LOOKAHEAD_M     0.40f
-#define NAV_TRACKING_SPEED_MAX_M_S   0.60f
+/* 第一次上车试跑用的保守值：先确认"能走直、能跟着弯、到点能停"，
+ * 确认无误后再往上加（上限受 BALANCE_SPEED_TARGET_MAX_MPS 约束）。 */
+#define NAV_TRACKING_SPEED_MAX_M_S   0.40f
 #define NAV_TRACKING_SPEED_MIN_M_S   0.15f
 #define NAV_TRACKING_SLOW_RADIUS_M   0.50f
 #define NAV_TRACKING_GOAL_RADIUS_M   0.10f
