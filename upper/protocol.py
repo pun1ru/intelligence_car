@@ -239,6 +239,37 @@ FRAME_FORMATS = {
 }
 
 
+class SequenceTracker:
+    """统计上行帧的丢帧数。
+
+    三种上行帧（遥测、校准、位姿）共用同一个序号，车端每 100 ms 依次发一帧，
+    所以序号在整条流上是连续的：n、n+1、n+2、n+3…… 因此必须对**每一帧**都
+    调用 update()。只对遥测帧计数会把中间的校准帧和位姿帧当成丢帧，链路完好
+    也会一直报丢失。
+    """
+
+    def __init__(self) -> None:
+        self.last_sequence: int | None = None
+        self.lost = 0
+
+    def reset(self) -> None:
+        self.last_sequence = None
+        self.lost = 0
+
+    def update(self, sequence: int) -> int:
+        """喂入一帧的序号，返回这一帧之前缺了几帧（0 表示连续）。"""
+        gap = 0
+        if self.last_sequence is not None:
+            gap = (sequence - self.last_sequence - 1) & 0xFF
+            # 间隔大于半圈的差值无法判断是我们丢帧还是刚重新同步，忽略
+            if gap < 128:
+                self.lost += gap
+            else:
+                gap = 0
+        self.last_sequence = sequence
+        return gap
+
+
 class TelemetryParser:
     def __init__(self) -> None:
         self.buffer = bytearray()

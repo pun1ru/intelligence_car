@@ -4,9 +4,9 @@ import unittest
 from protocol import (
     BALANCE, FEEDFORWARD, MOTION, NAV_POSE_LENGTH, NAV_POSE_TYPE, PID_BASE,
     POSE_VALID_DATA, POSE_VALID_NAVIGATION, STATE, STEERING_FEEDFORWARD,
-    SUPPORT, TELEMETRY_LENGTH, NavPoseTelemetry, TelemetryParser, command_frame,
-    crc16, decode_nav_pose, decode_telemetry, feedforward_frame, pid_frame,
-    steering_feedforward_frame,
+    SUPPORT, TELEMETRY_LENGTH, NavPoseTelemetry, SequenceTracker, TelemetryParser,
+    command_frame, crc16, decode_nav_pose, decode_telemetry, feedforward_frame,
+    pid_frame, steering_feedforward_frame,
 )
 
 
@@ -120,6 +120,28 @@ class ProtocolTest(unittest.TestCase):
         self.assertEqual(decoded.valid,
                          POSE_VALID_DATA | POSE_VALID_NAVIGATION)
         self.assertEqual(sample_pose_frame(), VEHICLE_POSE_FRAME)
+
+    def test_sequence_tracker_counts_missing_frames(self):
+        tracker = SequenceTracker()
+        # 三种帧共用一个序号，正常时序号连续，不应报丢帧
+        for sequence in (0, 1, 2, 3, 4, 5, 6):
+            self.assertEqual(tracker.update(sequence), 0)
+        self.assertEqual(tracker.lost, 0)
+        # 少一帧（序号 7 没收到）：下一帧 8 应当报丢失 1
+        self.assertEqual(tracker.update(8), 1)
+        self.assertEqual(tracker.lost, 1)
+        # 一次丢三帧
+        self.assertEqual(tracker.update(12), 3)
+        self.assertEqual(tracker.lost, 4)
+        # 序号回绕：255 之后是 0，不算丢帧
+        tracker.reset()
+        self.assertEqual(tracker.update(255), 0)
+        # 回绕处丢一帧（255 之后应当是 0，实际收到 1）
+        self.assertEqual(tracker.update(1), 1)
+        self.assertEqual(tracker.lost, 1)
+        # 间隔过大说明刚重新同步或换了连接，不当作丢帧
+        self.assertEqual(tracker.update(200), 0)
+        self.assertEqual(tracker.lost, 1)
 
 
 if __name__ == "__main__":

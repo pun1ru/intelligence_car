@@ -24,8 +24,9 @@ from protocol import (
     BALANCE, HEARTBEAT, MOTION, NAVIGATION, PROTECT, STATE, SUPPORT,
     VALID_ATTITUDE, VALID_CONTROL, VALID_IMU, VALID_LIFT, VALID_MOTION,
     VALID_STATE, POSE_VALID_DATA, CalibrationTelemetry, NavPoseTelemetry,
-    Telemetry, TelemetryParser, calibration_frame, command_frame,
-    feedforward_frame, pid_frame, steering_feedforward_frame, steering_frame,
+    SequenceTracker, Telemetry, TelemetryParser, calibration_frame,
+    command_frame, feedforward_frame, pid_frame, steering_feedforward_frame,
+    steering_frame,
 )
 
 BAUD = 115200
@@ -65,9 +66,8 @@ class Console(tk.Tk):
         self.parser = TelemetryParser()
         self.last_frame_at = 0.0
         self.last_heartbeat_at = 0.0
-        self.last_sequence: int | None = None
+        self.sequence = SequenceTracker()
         self.last_protect_at = 0.0
-        self.lost_frames = 0
         self.latest_frame: Telemetry | None = None
         # 车端 0x82 帧报来的位姿，仅用于和主机端推算做对比
         self.latest_pose: NavPoseTelemetry | None = None
@@ -408,8 +408,7 @@ class Console(tk.Tk):
             messagebox.showerror("Serial connection failed", str(exc))
             return
         self.parser = TelemetryParser()
-        self.last_sequence = None
-        self.lost_frames = 0
+        self.sequence.reset()
         self.last_frame_at = 0.0
         self.last_heartbeat_at = 0.0
         self.last_protect_at = 0.0
@@ -576,13 +575,9 @@ class Console(tk.Tk):
             self.metrics[key].set(value)
 
     def display(self, frame: Telemetry) -> None:
-        if self.last_sequence is not None:
-            gap = (frame.sequence - self.last_sequence - 1) & 0xFF
-            if gap < 128:
-                self.lost_frames += gap
-        self.last_sequence = frame.sequence
         self.latest_frame = frame
-        self.metrics["quality"].set(f"lost {self.lost_frames} / bad {self.parser.bad_frames}")
+        self.metrics["quality"].set(
+            f"lost {self.sequence.lost} / bad {self.parser.bad_frames}")
         self.metrics["mode"].set(
             MODES[frame.control_mode] if frame.valid & VALID_STATE and
             frame.control_mode < len(MODES) else "--")
@@ -812,6 +807,8 @@ class Console(tk.Tk):
                     self.last_heartbeat_at = now
                 data = self.port.read(min(self.port.in_waiting, 4096))
                 for frame in self.parser.feed(data):
+                    # 三种帧共用一个序号，所以每帧都要过一遍丢帧统计
+                    self.sequence.update(frame.sequence)
                     if isinstance(frame, CalibrationTelemetry):
                         self.display_calibration(frame)
                     elif isinstance(frame, NavPoseTelemetry):
