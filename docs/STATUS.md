@@ -44,7 +44,7 @@ RT1064 核心板 + 主板；IMU660RC（SPI4）；双编码器（QTMR1，1024 线
 | --- | --- | --- |
 | `NAV_TRACKING_ENABLE_DEFAULT` | 1 | 跟踪总开关（比赛禁用无线，必须在这里定好） |
 | `NAV_TRACKING_DRIVE_ENABLE` | 1 | 1=驱动电机；**0=只算不动**（台架验证用，车不会动） |
-| `NAV_TRACKING_LOOKAHEAD_M` | 0.40 | 前视距离，调大走线更平缓 |
+| `NAV_TRACKING_LOOKAHEAD_M` | 0.28 | 前视距离（车看多远），调大走线更平缓但会抄内圈 |
 | `NAV_TRACKING_SPEED_MAX/MIN_M_S` | 0.20 / 0.15 | 功能验证阶段的保守值，确认能跟线后再逐步加 |
 | 角度环 / 速度环 / 转向环 | 600/0/30、24/3/0、30/2/0 | 均已写回源码，断电不丢 |
 
