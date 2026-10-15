@@ -152,9 +152,10 @@
  *       既不用怕车自己跑，也不用让电机和你抢方向盘。 */
 #define NAV_TRACKING_DRIVE_ENABLE    1U
 #define NAV_TRACKING_LOOKAHEAD_M     0.40f
-/* 第一次上车试跑用的保守值：先确认"能走直、能跟着弯、到点能停"，
- * 确认无误后再往上加（上限受 BALANCE_SPEED_TARGET_MAX_MPS 约束）。 */
-#define NAV_TRACKING_SPEED_MAX_M_S   0.40f
+/* 功能验证阶段的保守值：目的是看清"导航层写得对不对"，不是跑性能。
+ * 速度压到 0.20 之后弯里几乎不降速（下限 0.15），轨迹形状就只反映转向环，
+ * 更容易判断。确认无误后再逐步往上加（上限受 BALANCE_SPEED_TARGET_MAX_MPS 约束）。 */
+#define NAV_TRACKING_SPEED_MAX_M_S   0.20f
 #define NAV_TRACKING_SPEED_MIN_M_S   0.15f
 #define NAV_TRACKING_SLOW_RADIUS_M   0.50f
 #define NAV_TRACKING_GOAL_RADIUS_M   0.10f
