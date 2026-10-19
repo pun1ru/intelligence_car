@@ -201,6 +201,9 @@
 #define SERIAL_COMMAND_CALIBRATE     0x06U
 #define SERIAL_COMMAND_STEERING      0x07U
 #define SERIAL_COMMAND_STEERING_FEEDFORWARD 0x08U
+/* 把当前位置重置为原点、当前车头方向记为 0°；上位机 Trajectory 页的
+ * "Reset pose" 按钮发它。方便原地重测，不必断电重做陀螺零偏校准。 */
+#define SERIAL_COMMAND_POSE_RESET    0x09U
 #define SERIAL_COMMAND_PID_BASE      0x50U
 #define SERIAL_COMMAND_PID_LAST      0x5BU
 #define SERIAL_PID_CONTROLLER_WHEEL  0U

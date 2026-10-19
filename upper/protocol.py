@@ -24,6 +24,9 @@ FEEDFORWARD = 5
 CALIBRATE = 6
 STEERING = 7
 STEERING_FEEDFORWARD = 8
+# 0x09：把车端当前位置/车头方向重置为原点（x=y=0、heading=0），并让路径跟踪
+# 从第一个点重新开始。陀螺零偏不受影响，所以重测前不必断电重校准。
+POSE_RESET = 9
 PID_BASE = 0x50
 PID_LAST = 0x5B
 PID_STEERING = 3
@@ -67,7 +70,8 @@ def pid_frame(controller: int, gain: int, value: float) -> bytes:
 
 def command_frame(command: int, value: int = 0, value2: int = 0) -> bytes:
     if command not in (HEARTBEAT, STATE, SPEED, YAW, MOTION,
-                       FEEDFORWARD, CALIBRATE, STEERING, STEERING_FEEDFORWARD):
+                       FEEDFORWARD, CALIBRATE, STEERING, STEERING_FEEDFORWARD,
+                       POSE_RESET):
         raise ValueError("unknown command")
     if command != MOTION and value2 != 0:
         raise ValueError("reserved value must be zero")
@@ -75,6 +79,8 @@ def command_frame(command: int, value: int = 0, value2: int = 0) -> bytes:
         raise ValueError("invalid state")
     if command == CALIBRATE and (value != 0 or value2 != 0):
         raise ValueError("calibration command takes no value")
+    if command == POSE_RESET and (value != 0 or value2 != 0):
+        raise ValueError("pose reset command takes no value")
     if command == STEERING and (value not in (0, 1) or value2 != 0):
         raise ValueError("invalid steering enable")
     if command == FEEDFORWARD and (value < 0 or value2 != 0):
@@ -98,6 +104,10 @@ def feedforward_frame(value: float) -> bytes:
 
 def calibration_frame() -> bytes:
     return command_frame(CALIBRATE)
+
+
+def pose_reset_frame() -> bytes:
+    return command_frame(POSE_RESET)
 
 
 def steering_frame(enabled: bool) -> bytes:

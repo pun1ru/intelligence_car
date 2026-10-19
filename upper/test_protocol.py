@@ -7,7 +7,7 @@ from protocol import (
     STEERING_FEEDFORWARD,
     SUPPORT, TELEMETRY_LENGTH, NavPoseTelemetry, SequenceTracker, TelemetryParser,
     command_frame, crc16, decode_nav_pose, decode_telemetry, feedforward_frame,
-    pid_frame, steering_feedforward_frame,
+    pid_frame, pose_reset_frame, steering_feedforward_frame,
 )
 
 
@@ -58,6 +58,9 @@ class ProtocolTest(unittest.TestCase):
         self.assertEqual(frame[7], 0x86)
         wheel_ff = feedforward_frame(12.25)
         self.assertEqual(wheel_ff[2], FEEDFORWARD)
+        # 位姿复位命令：type=0x09，两个值必须为 0（车端会拒绝带值的帧）
+        self.assertEqual(pose_reset_frame(),
+                         bytes.fromhex("a5 5a 09 00 00 00 00 09"))
         self.assertEqual(struct.unpack_from("<h", wheel_ff, 3)[0], 12)
         steering_ff = steering_feedforward_frame(4.25)
         self.assertEqual(steering_ff[2], STEERING_FEEDFORWARD)

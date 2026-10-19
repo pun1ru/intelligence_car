@@ -49,6 +49,7 @@ typedef struct
     float steering_feedforward_gain;
     uint8_t steering_enabled;
     uint8_t gyro_bias_calibrate_requested;
+    uint8_t pose_reset_requested;
     uint32_t support_pitch_age_ms;
     uint32_t support_exit_age_ms;
     uint32_t balance_entry_kick_age_ms;

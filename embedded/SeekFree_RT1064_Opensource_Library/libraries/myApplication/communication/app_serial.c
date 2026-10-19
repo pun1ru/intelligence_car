@@ -193,6 +193,7 @@ uint8_t app_serial_feed_byte(app_serial_parser_t *parser, uint8_t byte,
         (command->type != SERIAL_COMMAND_CALIBRATE) &&
         (command->type != SERIAL_COMMAND_STEERING) &&
         (command->type != SERIAL_COMMAND_STEERING_FEEDFORWARD) &&
+        (command->type != SERIAL_COMMAND_POSE_RESET) &&
         ((command->type < SERIAL_COMMAND_PID_BASE) ||
          (command->type > SERIAL_COMMAND_PID_LAST)))
     {
@@ -244,6 +245,11 @@ uint8_t app_serial_feed_byte(app_serial_parser_t *parser, uint8_t byte,
         return 0U;
     }
     if ((command->type == SERIAL_COMMAND_CALIBRATE) &&
+        ((command->value != 0) || (command->value2 != 0)))
+    {
+        return 0U;
+    }
+    if ((command->type == SERIAL_COMMAND_POSE_RESET) &&
         ((command->value != 0) || (command->value2 != 0)))
     {
         return 0U;

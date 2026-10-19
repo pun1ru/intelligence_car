@@ -220,3 +220,10 @@
 - 原理：最大曲率仍是 1/0.4（最小转弯半径不变），但曲率在 0.209 m（0.2 m/s 下约 1 s）内线性升到最大、再线性退回 0，等于给转向环约 1 s 的"打方向时间"，而不是瞬间要求满舵。
 - 验证：Keil 全量编译 0 Error / 0 Warning，产物 `Objects\rt1064.axf`。实车待跑。
 - 判读标准：转弯中 cross 的负峰应小于 5 cm、出弯正峰应远小于 12 cm；最终朝向仍接近 90°；不应出现左右发抖（若发抖说明点间距/前视距离不匹配，回退前视到 0.22）。
+
+## 2026-10-19（测试路径改 180° 掉头 + 上位机可复位位姿）
+
+- 路径：`app_nav_path.c` 的测试路径改为 直行 1.0 m → 15° 缓入 → R=0.4 m 圆弧 150° → 15° 缓出 → 直行 1.0 m。总里程 3.466 m，终点 (0, -0.809)，停住朝向 -X（转 180°）；掉头最远到 x≈1.50 m，场地要留约 1.55 m × 0.85 m。前视 0.18、速度 0.20 仍未动。
+- 新增位姿复位命令（车端 `SERIAL_COMMAND_POSE_RESET = 0x09`）：`app_serial.c` 收帧校验 → `app_state.c` 置 `pose_reset_requested` 并切保护 → `state_task` 调 `decision_task_request_pose_reset()` → `decision_task` 执行 `app_pose_reset()` + `app_nav_reset()`，下一拍用当前车头重新定原点。只清位置/航向/跟踪进度，**不动陀螺零偏**，所以推车重测不必断电重校准。
+- 上位机：`protocol.py` 加 `POSE_RESET` 与 `pose_reset_frame()`；`main.py` 轨迹页加 `Reset pose (origin here)` 按钮（`Reset trajectory` 只清屏幕）；版本号升到 `v11-posereset`，标题里能一眼确认跑的是新版本。
+- 验证：Keil 全量编译 0 Error / 0 Warning；`upper/test_protocol.py` 6 项通过（新增的复位帧固定字节 `a5 5a 09 00 00 00 00 09` 已断言）。实车待跑。

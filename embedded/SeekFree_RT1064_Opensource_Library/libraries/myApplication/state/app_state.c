@@ -114,6 +114,7 @@ void app_state_step(app_state_t *state, const app_state_buttons_t *buttons,
     state->reset_ekf_requested = 0U;
     state->pid_update_requested = 0U;
     state->gyro_bias_calibrate_requested = 0U;
+    state->pose_reset_requested = 0U;
     if ((command != NULL) &&
         (command->type != SERIAL_COMMAND_HEARTBEAT) &&
         (command->type != SERIAL_COMMAND_STATE) &&
@@ -124,6 +125,7 @@ void app_state_step(app_state_t *state, const app_state_buttons_t *buttons,
         (command->type != SERIAL_COMMAND_CALIBRATE) &&
         (command->type != SERIAL_COMMAND_STEERING) &&
         (command->type != SERIAL_COMMAND_STEERING_FEEDFORWARD) &&
+        (command->type != SERIAL_COMMAND_POSE_RESET) &&
         ((command->type < SERIAL_COMMAND_PID_BASE) ||
          (command->type > SERIAL_COMMAND_PID_LAST)))
     {
@@ -249,6 +251,15 @@ void app_state_step(app_state_t *state, const app_state_buttons_t *buttons,
     if ((command != NULL) && (command->type == SERIAL_COMMAND_CALIBRATE))
     {
         state->gyro_bias_calibrate_requested = 1U;
+        enter_protection(state);
+        return;
+    }
+
+    /* 复位位姿：只清"车在哪、朝哪"，不动陀螺零偏。要求先停车再按，
+     * 这样"此刻"的车头方向才和地上摆的起点一致。 */
+    if ((command != NULL) && (command->type == SERIAL_COMMAND_POSE_RESET))
+    {
+        state->pose_reset_requested = 1U;
         enter_protection(state);
         return;
     }

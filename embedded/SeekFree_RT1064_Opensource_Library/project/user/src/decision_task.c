@@ -38,6 +38,14 @@ typedef struct
 static QueueHandle_t pose_queue;
 static app_pose_state_t pose_state;
 static app_nav_state_t nav_state;
+/* 上位机"Reset pose"按钮的请求。单字节写在状态任务、读在 decision 任务，
+ * 读写都是单字节，读后清零即可，不需要额外的锁。 */
+static volatile uint8_t pose_reset_request;
+
+void decision_task_request_pose_reset(void)
+{
+    pose_reset_request = 1U;
+}
 
 uint8_t decision_task_get_pose(app_pose_t *pose)
 {
@@ -106,6 +114,17 @@ void decision_task(void *pvParameters)
         /* 距上次成功积分的间隔。用真实 tick 差而不是固定周期：
          * 这个任务优先级低，偶尔会被高优先级任务挤掉一两个周期。 */
         float dt_s = (float)(now - last_pose_tick) / (float)configTICK_RATE_HZ;
+
+        /* 上位机要求复位：清位姿、把跟踪进度归零，下一拍用当前车头重新定原点。
+         * 放在状态判断之外，这样保护状态下手推车也能复位。 */
+        if (pose_reset_request != 0U)
+        {
+            pose_reset_request = 0U;
+            app_pose_reset(&pose_state);
+            app_nav_reset(&nav_state);
+            origin_pending = 1U;
+            last_pose_tick = now;
+        }
 
         /* 状态快照拿不到时（超过 VEHICLE_STATE_TIMEOUT_MS 没更新）就整轮跳过，
          * 宁可少算一次，也不要凭猜测的车辆模式去重设原点。 */

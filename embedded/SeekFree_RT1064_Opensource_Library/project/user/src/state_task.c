@@ -2,6 +2,7 @@
 
 #include "app_serial.h"
 #include "app_state.h"
+#include "decision_task.h"
 #include "estimate_task.h"
 #include "FreeRTOS.h"
 #include "general_define.h"
@@ -104,6 +105,10 @@ void state_task(void *pvParameters)
             (state.control_mode != APP_STATE_CALIBRATION))
         {
             estimate_task_request(ESTIMATE_REQUEST_CANCEL);
+        }
+        else if (state.pose_reset_requested != 0U)
+        {
+            decision_task_request_pose_reset();
         }
         else if (state.gyro_bias_calibrate_requested != 0U)
         {

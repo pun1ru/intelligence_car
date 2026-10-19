@@ -18,4 +18,9 @@ uint8_t decision_task_get_pose(app_pose_t *pose);
  * 此时不改动 *nav。语义见 app_nav.h。 */
 uint8_t decision_task_get_nav(app_nav_command_t *nav);
 
+/* 请求把"此刻的位置/车头方向"重新定义为原点（x=y=0、heading=0），
+ * 并让路径跟踪从第一个点重新开始。任何任务都可以调用，实际复位在
+ * decision_task 的下一个周期完成。 */
+void decision_task_request_pose_reset(void);
+
 #endif

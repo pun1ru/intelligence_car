@@ -27,7 +27,7 @@ from protocol import (
     NavPoseTelemetry, SequenceTracker, Telemetry, TelemetryParser,
     calibration_frame,
     command_frame, feedforward_frame, pid_frame, steering_feedforward_frame,
-    steering_frame,
+    pose_reset_frame, steering_frame,
 )
 
 BAUD = 115200
@@ -41,7 +41,7 @@ DRAW_PERIOD_S = 0.2
 TIMEOUT_NOTICE = "Telemetry timeout; protection requested."
 # 显示在窗口标题里。桌面上存在多份仓库副本，靠这个标记一眼看出窗口跑的是哪份
 # 代码：标题里没有这个标记，就说明打开的是旧副本或改动前的旧进程。
-UI_VERSION = "v10-pose"
+UI_VERSION = "v11-posereset"
 MODES = ("Button", "Serial", "Calibration")
 STATES = ("Protect", "Balance", "Navigation", "Support")
 CHARTS = (
@@ -340,6 +340,10 @@ class Console(tk.Tk):
             trajectory_controls.grid(row=0, column=0, sticky="ew", pady=(0, 5))
             ttk.Button(trajectory_controls, text="Reset trajectory",
                        command=self.reset_trajectory).pack(side="left")
+            # 这个按钮会真的让车端把"此刻"当成原点，不只是清屏幕上的线。
+            # 推车重测前按一下，就不用断电、也不用重做陀螺零偏校准。
+            ttk.Button(trajectory_controls, text="Reset pose (origin here)",
+                       command=self.reset_pose).pack(side="left", padx=(6, 0))
             ttk.Label(trajectory_controls,
                       text="Body frame: +X forward, +Y left; origin and heading are set on reset.").pack(
                           side="left", padx=10)
@@ -592,6 +596,21 @@ class Console(tk.Tk):
         except (serial.SerialException, serial.SerialTimeoutException) as exc:
             self.notice.set(f"Calibration send failed: {exc}")
             self.disconnect()
+
+    def reset_pose(self) -> None:
+        """让车端把当前位置/车头方向重设为原点，并清掉屏幕上的旧轨迹。"""
+        if not self.telemetry_online():
+            self.notice.set("No live telemetry; pose was not reset.")
+            return
+        try:
+            self.port.write(pose_reset_frame())
+        except (serial.SerialException, serial.SerialTimeoutException) as exc:
+            self.notice.set(f"Pose reset send failed: {exc}")
+            self.disconnect()
+            return
+        # 车端会把车辆切回保护状态（防止带速复位），提示里说清楚。
+        self.notice.set("Pose reset: x=y=0, heading=0; vehicle enters protection.")
+        self.reset_trajectory()
 
     def telemetry_online(self) -> bool:
         return self.port is not None and self.last_frame_at > 0 and \
