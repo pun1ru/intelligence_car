@@ -63,12 +63,15 @@ HEARTBEAT_MS = 100
 KEYBOARD_PERIOD_MS = 100
 STALE_S = 0.5
 HISTORY_LENGTH = 600
+# 蓝线积分允许的最大单步间隔：遥测 10 Hz 正常 0.1 s，丢一两帧到 0.3 s 还能接受；
+# 再大就把线断开，而不是拿旧航向补一大段直线。
+TRAJECTORY_MAX_STEP_S = 0.35
 # 画图限流：5 Hz 足够看曲线，又能让 poll() 及时读串口（见 display()）
 DRAW_PERIOD_S = 0.2
 TIMEOUT_NOTICE = "Telemetry timeout; protection requested."
 # 显示在窗口标题里。桌面上存在多份仓库副本，靠这个标记一眼看出窗口跑的是哪份
 # 代码：标题里没有这个标记，就说明打开的是旧副本或改动前的旧进程。
-UI_VERSION = "v12-refpath"
+UI_VERSION = "v13-gapbreak"
 MODES = ("Button", "Serial", "Calibration")
 STATES = ("Protect", "Balance", "Navigation", "Support")
 CHARTS = (
@@ -731,12 +734,18 @@ class Console(tk.Tk):
             self._draw_trajectory()
 
     def _update_trajectory(self, frame: Telemetry) -> None:
+        # 蓝线是"上位机自己推算的轨迹"：用遥测里的左右轮速取平均得到前进速度，
+        # 再用 IMU yaw 积分方向。它和车端位姿（橙线）是两条独立的推算链，
+        # 一开始重合、越走越散才说明估计有问题。
+        #
+        # 数据一断（丢帧、或车端报了 lift 标志），这里**必须把线断开**：
+        # 否则绘图会把断点前后直接连成一条直线，看起来就像"车突然横着走了一段"。
         if frame.valid & VALID_LIFT:
-            # Keep the time origin current so the first grounded frame does not
-            # integrate a fictitious distance over the airborne interval.
+            self._break_trajectory()
             self.last_trajectory_uptime_ms = frame.uptime_ms
             return
         if not (frame.valid & VALID_MOTION and frame.valid & VALID_ATTITUDE):
+            self._break_trajectory()
             return
         if self.last_trajectory_uptime_ms is None:
             self.last_trajectory_uptime_ms = frame.uptime_ms
@@ -744,7 +753,10 @@ class Console(tk.Tk):
             return
         dt = (frame.uptime_ms - self.last_trajectory_uptime_ms) / 1000.0
         self.last_trajectory_uptime_ms = frame.uptime_ms
-        if not 0.0 < dt <= 1.0:
+        # 遥测 10 Hz，正常 dt=0.1 s；偶尔丢一两帧到 0.3 s 还能接受。
+        # 超过 0.35 s 说明中间断了一段，这一段里程无法补算，断开而不是硬连。
+        if not 0.0 < dt <= TRAJECTORY_MAX_STEP_S:
+            self._break_trajectory()
             return
         speed = (frame.left_speed_m_s + frame.right_speed_m_s) * 0.5
         if self.trajectory_heading_zero_deg is None:
@@ -756,6 +768,11 @@ class Console(tk.Tk):
         self.trajectory_points.append((self.trajectory_x, self.trajectory_y))
         self.metrics["trajectory"].set(
             f"{self.trajectory_x:.2f}, {self.trajectory_y:.2f}")
+
+    def _break_trajectory(self) -> None:
+        """在蓝线里插一个 NaN，让 matplotlib 断开折线（不是连一条假直线）。"""
+        if self.trajectory_points and not math.isnan(self.trajectory_points[-1][0]):
+            self.trajectory_points.append((float("nan"), float("nan")))
 
     def display_pose(self, frame: NavPoseTelemetry) -> None:
         """接收车端位姿帧：更新读数，并把轨迹点追加给轨迹图。
@@ -872,21 +889,28 @@ class Console(tk.Tk):
         # 蓝色：主机端用遥测里的轮速和 yaw 自己积分出来的轨迹
         x_values = [point[0] for point in self.trajectory_points]
         y_values = [point[1] for point in self.trajectory_points]
-        axis.plot(x_values, y_values, color="tab:blue", linewidth=1.8, label="fused path")
+        axis.plot(x_values, y_values, color="tab:blue", linewidth=1.8,
+                  label="host integration (wheel speed + yaw)")
         axis.scatter([x_values[0]], [y_values[0]], color="tab:green", label="start")
-        axis.scatter([x_values[-1]], [y_values[-1]], color="tab:red", label="current")
+        finite_points = [(x, y) for x, y in zip(x_values, y_values)
+                         if math.isfinite(x) and math.isfinite(y)]
+        if finite_points:
+            axis.scatter([finite_points[-1][0]], [finite_points[-1][1]],
+                         color="tab:red", label="current")
         # 橙色：车端算出来的位姿。两条线应该基本重合；分开的方向能提示原因：
         # 整体偏短是轮径/计数标定误差，越走越散是 yaw 漂移，转弯处突然甩开是打滑。
         pose_x = [point[0] for point in self.vehicle_pose_points]
         pose_y = [point[1] for point in self.vehicle_pose_points]
         if len(pose_x) > 1:
             axis.plot(pose_x, pose_y, color="tab:orange", linewidth=1.8,
-                      label="vehicle pose")
+                      label="vehicle pose (encoder + yaw)")
             axis.scatter([pose_x[-1]], [pose_y[-1]], color="tab:orange",
                          marker="x", label="vehicle pose now")
         # 坐标范围要同时容纳两条线，否则车端曲线会被裁掉
-        all_x = x_values + pose_x + [point[0] for point in self.reference_path]
-        all_y = y_values + pose_y + [point[1] for point in self.reference_path]
+        all_x = [x for x, _y in finite_points] + pose_x + \
+            [point[0] for point in self.reference_path]
+        all_y = [y for _x, y in finite_points] + pose_y + \
+            [point[1] for point in self.reference_path]
         span = max(max(all_x) - min(all_x), max(all_y) - min(all_y), 1.0)
         margin = max(0.25, span * 0.15)
         axis.set_xlim(min(all_x) - margin, max(all_x) + margin)
