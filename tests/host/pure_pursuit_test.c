@@ -223,6 +223,22 @@ static void test_lookahead_extrapolates_past_end(void)
     check_int("extrapolate/target_index", (int)output.target_index, 3);
 }
 
+/* 前视点要在段内插值，而不是退到下一个路径点：
+ * 路径点每 1 m 一个，车在 (0.2,0.2)、前视 0.5 m，前视点应是 (0.5,0)，
+ * 期望航向 atan2(-0.2,0.3)≈-33.7°；退到下一个点 (1,0) 则只有 -14°，
+ * 直线段点稀时就会表现为"朝着很远的点抄近路"。 */
+static void test_lookahead_interpolates_within_segment(void)
+{
+    pure_pursuit_config_t config = test_config();
+    pure_pursuit_state_t state;
+    pure_pursuit_output_t output;
+
+    pure_pursuit_init(&state);
+    (void)pure_pursuit_step(&config, &state, straight_path, 4U, 0.20f, 0.20f,
+                            0.0f, &output);
+    check_between("interpolate/yaw_error", output.yaw_error_deg, -40.0f, -28.0f);
+}
+
 /* 非法输入一律返回 0，并且不改写输出 */
 static void test_rejects_invalid_input(void)
 {
@@ -264,6 +280,7 @@ int main(void)
     test_single_point_path();
     test_on_top_of_target();
     test_lookahead_extrapolates_past_end();
+    test_lookahead_interpolates_within_segment();
     test_rejects_invalid_input();
 
     printf("%d checks, %d failure(s)\n", checks, failures);

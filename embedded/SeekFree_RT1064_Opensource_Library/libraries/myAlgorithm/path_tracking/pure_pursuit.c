@@ -97,14 +97,39 @@ static uint16_t pure_pursuit_lookahead_index(const pure_pursuit_point_t *path,
 
     for (index = (uint16_t)(closest + 1U); index < count; index++)
     {
-        arc_length += pure_pursuit_distance(path[index - 1U].x_m,
-                                            path[index - 1U].y_m,
-                                            path[index].x_m, path[index].y_m);
-        target = index;
-        if (arc_length >= lookahead_m)
+        float seg = pure_pursuit_distance(path[index - 1U].x_m,
+                                          path[index - 1U].y_m,
+                                          path[index].x_m, path[index].y_m);
+
+        if (seg <= 0.0f)
         {
-            break;
+            /* 重复点：没有长度，跳过，避免下面除以 0 */
+            target = index;
+            continue;
         }
+        if (arc_length + seg >= lookahead_m)
+        {
+            /* 前视距离落在这一段的中间：按比例插值，取"正好走了一个前视距离"
+             * 的那个点。不插值就会退到这一段末尾的路径点上——直线段点稀时
+             * 前视点会一下跳到很远的点（甚至直接跳到终点），车就斜着抄近路。 */
+            float ratio = (lookahead_m - arc_length) / seg;
+
+            if (ratio < 0.0f)
+            {
+                ratio = 0.0f;
+            }
+            else if (ratio > 1.0f)
+            {
+                ratio = 1.0f;
+            }
+            *target_x = path[index - 1U].x_m +
+                        (path[index].x_m - path[index - 1U].x_m) * ratio;
+            *target_y = path[index - 1U].y_m +
+                        (path[index].y_m - path[index - 1U].y_m) * ratio;
+            return index;
+        }
+        arc_length += seg;
+        target = index;
     }
     if ((target == (uint16_t)(count - 1U)) && (arc_length < lookahead_m) &&
         (count >= 2U))
