@@ -191,7 +191,8 @@ static void test_single_point_path(void)
     check_int("single/index", (int)output.target_index, 0);
 }
 
-/* 车正好压在前视点上：应保持当前航向，而不是被 atan2(0,0) 的噪声带跑 */
+/* 车正好压在最后一个点上：前视点延伸到末段方向之外，期望航向应等于末段方向
+ * （0°），而不是原地保持当前 7.5° 或吃 atan2(0,0) 的噪声。 */
 static void test_on_top_of_target(void)
 {
     pure_pursuit_config_t config = test_config();
@@ -202,7 +203,24 @@ static void test_on_top_of_target(void)
     pure_pursuit_init(&state);
     (void)pure_pursuit_step(&config, &state, two_points, 2U, 2.0f, 0.0f, 7.5f,
                             &output);
-    check_close("ontop/heading", output.target_heading_deg, 7.5f);
+    check_close("ontop/heading", output.target_heading_deg, 0.0f);
+}
+
+/* 快到终点时前视点要沿末段方向延伸：
+ * 车在 (2.7, 0.2) 偏在直线右侧 0.2 m，如果目标退化成终点 (3,0)，期望航向是
+ * -33.7°（斜插）；延伸 0.5 m 后目标是 (3.5,0)，航向约 -14°，车会顺着末段
+ * 方向慢慢并回中线，而不是到点再回正。 */
+static void test_lookahead_extrapolates_past_end(void)
+{
+    pure_pursuit_config_t config = test_config();
+    pure_pursuit_state_t state;
+    pure_pursuit_output_t output;
+
+    pure_pursuit_init(&state);
+    (void)pure_pursuit_step(&config, &state, straight_path, 4U, 2.70f, 0.20f,
+                            0.0f, &output);
+    check_between("extrapolate/yaw_error", output.yaw_error_deg, -20.0f, -8.0f);
+    check_int("extrapolate/target_index", (int)output.target_index, 3);
 }
 
 /* 非法输入一律返回 0，并且不改写输出 */
@@ -245,6 +263,7 @@ int main(void)
     test_index_never_goes_back();
     test_single_point_path();
     test_on_top_of_target();
+    test_lookahead_extrapolates_past_end();
     test_rejects_invalid_input();
 
     printf("%d checks, %d failure(s)\n", checks, failures);

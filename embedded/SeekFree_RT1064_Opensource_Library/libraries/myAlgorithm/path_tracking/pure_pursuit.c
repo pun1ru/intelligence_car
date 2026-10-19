@@ -79,12 +79,17 @@ static uint16_t pure_pursuit_closest_index(const pure_pursuit_point_t *path,
     return best_index;
 }
 
-/* 沿路径往前走，累积弧长到前视距离的那个点就是前视点；不够长就用最后一个点。
+/* 沿路径往前走，累积弧长到前视距离的那个点就是前视点。
  * 注意是"沿路径量"而不是"车到点的直线距离"：后者在车略微越过最近点时会把
- * 前视点判到车身后面，于是算出一个要求倒退的航向。 */
+ * 前视点判到车身后面，于是算出一个要求倒退的航向。
+ *
+ * 如果剩余路径不够一个前视距离（快到终点了），就沿最后一段的方向把前视点
+ * **延伸到路径终点之外**。否则前视点会退化成"最后一个点"，车哪怕只偏了几
+ * 厘米，也会斜着直插终点、到点才回正——实车表现为终点前走斜线。 */
 static uint16_t pure_pursuit_lookahead_index(const pure_pursuit_point_t *path,
                                              uint16_t count, uint16_t closest,
-                                             float lookahead_m)
+                                             float lookahead_m, float *target_x,
+                                             float *target_y)
 {
     uint16_t index;
     uint16_t target = closest;
@@ -101,6 +106,24 @@ static uint16_t pure_pursuit_lookahead_index(const pure_pursuit_point_t *path,
             break;
         }
     }
+    if ((target == (uint16_t)(count - 1U)) && (arc_length < lookahead_m) &&
+        (count >= 2U))
+    {
+        float sx = path[count - 1U].x_m - path[count - 2U].x_m;
+        float sy = path[count - 1U].y_m - path[count - 2U].y_m;
+        float length = sqrtf(sx * sx + sy * sy);
+
+        if (length > 0.0f)
+        {
+            float extra = (lookahead_m - arc_length) / length;
+
+            *target_x = path[count - 1U].x_m + sx * extra;
+            *target_y = path[count - 1U].y_m + sy * extra;
+            return target;
+        }
+    }
+    *target_x = path[target].x_m;
+    *target_y = path[target].y_m;
     return target;
 }
 
@@ -141,6 +164,8 @@ uint8_t pure_pursuit_step(const pure_pursuit_config_t *config,
     float curvature;
     float radius;
     float speed;
+    float target_x;
+    float target_y;
 
     if ((pure_pursuit_config_valid(config) == 0U) || (state == NULL) ||
         (path == NULL) || (output == NULL) || (count == 0U) ||
@@ -156,11 +181,12 @@ uint8_t pure_pursuit_step(const pure_pursuit_config_t *config,
 
     closest = pure_pursuit_closest_index(path, count, state->index, x_m, y_m);
     target = pure_pursuit_lookahead_index(path, count, closest,
-                                          config->lookahead_m);
+                                          config->lookahead_m, &target_x,
+                                          &target_y);
 
-    /* 期望航向 = 车指向当前前视点的方向 */
-    dx = path[target].x_m - x_m;
-    dy = path[target].y_m - y_m;
+    /* 期望航向 = 车指向当前前视点的方向（前视点可能在终点外的延长线上） */
+    dx = target_x - x_m;
+    dy = target_y - y_m;
     if ((fabsf(dx) < 1.0e-6f) && (fabsf(dy) < 1.0e-6f))
     {
         /* 车正好压在前视点上：保持当前航向，别把 atan2(0,0) 的噪声当指令 */
