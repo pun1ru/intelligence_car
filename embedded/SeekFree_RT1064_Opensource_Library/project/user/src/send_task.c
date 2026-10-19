@@ -27,12 +27,17 @@
  */
 
 #if ((SEND_TELEMETRY_PERIOD_MS % SEND_TASK_PERIOD_MS) != 0U) || \
-    ((SEND_SLOW_PERIOD_MS % SEND_TELEMETRY_PERIOD_MS) != 0U)
+    ((SEND_POSE_PERIOD_MS % SEND_TASK_PERIOD_MS) != 0U) || \
+    ((SEND_CALIBRATION_PERIOD_MS % SEND_TASK_PERIOD_MS) != 0U)
 #error Send periods must be multiples: slot <= telemetry <= slow.
 #endif
 
 #define SEND_TELEMETRY_TICKS (SEND_TELEMETRY_PERIOD_MS / SEND_TASK_PERIOD_MS)
-#define SEND_SLOW_TICKS      (SEND_SLOW_PERIOD_MS / SEND_TASK_PERIOD_MS)
+#define SEND_POSE_TICKS      (SEND_POSE_PERIOD_MS / SEND_TASK_PERIOD_MS)
+#define SEND_CALIBRATION_TICKS (SEND_CALIBRATION_PERIOD_MS / SEND_TASK_PERIOD_MS)
+
+/* 时隙分配（tick % 25）：0/5/10/15/20 遥测，2/12/22 位姿，4 校准。
+ * 三类帧不重叠，保证任意 20 ms 时隙最多只发一帧。 */
 
 void send_task(void *pvParameters)
 {
@@ -106,7 +111,7 @@ void send_task(void *pvParameters)
             }
             app_serial_send(&telemetry);
         }
-        else if ((tick % SEND_SLOW_TICKS) == 1U)
+        else if ((tick % SEND_POSE_TICKS) == 2U)
         {
             app_serial_pose_t pose_telemetry = {0};
             app_nav_command_t nav;
@@ -146,7 +151,7 @@ void send_task(void *pvParameters)
             }
             app_serial_send_pose(&pose_telemetry);
         }
-        else if ((tick % SEND_SLOW_TICKS) == 3U)
+        else if ((tick % SEND_CALIBRATION_TICKS) == 4U)
         {
             app_gyro_calibration_result_t gyro_calibration;
             app_serial_calibration_t calibration_telemetry;

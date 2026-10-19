@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from collections import deque
 import math
+from pathlib import Path
+import re
 import time
 import tkinter as tk
 from tkinter import messagebox, ttk
@@ -31,6 +33,31 @@ from protocol import (
 )
 
 BAUD = 115200
+
+# 参考路径直接从车端路径表读，避免上位机再抄一份、两边改不同步。
+# 只认 `nav_path_points[] = {...}` 这一段的 {x f, y f} 形式。
+PATH_SOURCE = (Path(__file__).resolve().parent.parent / "embedded" /
+               "SeekFree_RT1064_Opensource_Library" / "libraries" /
+               "myApplication" / "navigation" / "app_nav_path.c")
+PATH_POINT_PATTERN = re.compile(
+    r"\{\s*(-?\d+(?:\.\d+)?)f\s*,\s*(-?\d+(?:\.\d+)?)f\s*\}")
+
+
+def load_reference_path() -> list[tuple[float, float]]:
+    """读车端路径表用于画参考线；读不到就返回空表（只影响画图）。"""
+    try:
+        text = PATH_SOURCE.read_text(encoding="utf-8", errors="ignore")
+    except OSError:
+        return []
+    start = text.find("nav_path_points[]")
+    if start < 0:
+        return []
+    end = text.find("};", start)
+    if end < 0:
+        return []
+    return [(float(x), float(y))
+            for x, y in PATH_POINT_PATTERN.findall(text[start:end])]
+
 POLL_MS = 50
 HEARTBEAT_MS = 100
 KEYBOARD_PERIOD_MS = 100
@@ -41,7 +68,7 @@ DRAW_PERIOD_S = 0.2
 TIMEOUT_NOTICE = "Telemetry timeout; protection requested."
 # 显示在窗口标题里。桌面上存在多份仓库副本，靠这个标记一眼看出窗口跑的是哪份
 # 代码：标题里没有这个标记，就说明打开的是旧副本或改动前的旧进程。
-UI_VERSION = "v11-posereset"
+UI_VERSION = "v12-refpath"
 MODES = ("Button", "Serial", "Calibration")
 STATES = ("Protect", "Balance", "Navigation", "Support")
 CHARTS = (
@@ -128,6 +155,9 @@ class Console(tk.Tk):
         self.history_start_s: float | None = None
         self.trajectory_points: deque[tuple[float, float]] = deque(
             [(0.0, 0.0)], maxlen=HISTORY_LENGTH * 4)
+        # 车端路径表（参考线），从 app_nav_path.c 读，用来判断"跟没跟上"；
+        # 读不到就是空表，只影响画图。
+        self.reference_path = load_reference_path()
         self.trajectory_x = 0.0
         self.trajectory_y = 0.0
         self.last_trajectory_uptime_ms: int | None = None
@@ -832,6 +862,13 @@ class Console(tk.Tk):
             return
         axis = self.trajectory_axis
         axis.clear()
+        # 灰色虚线：车端路径表里的参考路径（从 app_nav_path.c 读取）。
+        # 有了它才能判断蓝/橙两条线是"跟得准"还是"整体跑偏"。
+        if len(self.reference_path) > 1:
+            axis.plot([point[0] for point in self.reference_path],
+                      [point[1] for point in self.reference_path],
+                      color="0.45", linestyle="--", linewidth=1.4,
+                      label="reference path")
         # 蓝色：主机端用遥测里的轮速和 yaw 自己积分出来的轨迹
         x_values = [point[0] for point in self.trajectory_points]
         y_values = [point[1] for point in self.trajectory_points]
@@ -848,8 +885,8 @@ class Console(tk.Tk):
             axis.scatter([pose_x[-1]], [pose_y[-1]], color="tab:orange",
                          marker="x", label="vehicle pose now")
         # 坐标范围要同时容纳两条线，否则车端曲线会被裁掉
-        all_x = x_values + pose_x
-        all_y = y_values + pose_y
+        all_x = x_values + pose_x + [point[0] for point in self.reference_path]
+        all_y = y_values + pose_y + [point[1] for point in self.reference_path]
         span = max(max(all_x) - min(all_x), max(all_y) - min(all_y), 1.0)
         margin = max(0.25, span * 0.15)
         axis.set_xlim(min(all_x) - margin, max(all_x) + margin)
