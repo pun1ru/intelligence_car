@@ -185,11 +185,12 @@
 /* 判断"已冲过终点"的余量：沿最后一段方向越过终点超过这个距离，就直接
  * 锁存为"已跑完"并停车，避免又掉头回去追终点（实车打转就是这么来的）。 */
 #define NAV_TRACKING_PAST_END_M      0.03f
-/* 功能验证阶段先用 0.20；导航层确认无误后（2026-10-19）加到 0.40 试探。
- * 弯里按曲率自动降速：曲率半径 0.4 m 时目标速度 = 上限 × (0.4/0.5) ≈ 0.32 m/s，
- * 直道上才是 0.40。上限还受 BALANCE_SPEED_TARGET_MAX_MPS（1.0）约束。
- * 若出现左右画龙/发抖，先回 0.30，再考虑把前视距离随速度放大。 */
-#define NAV_TRACKING_SPEED_MAX_M_S   0.40f
+/* 速度上限演进：0.20（功能验证）→ 0.40（导航层确认）→ 0.60（2026-10-19 试探）。
+ * 弯里按曲率自动降速：曲率半径 0.4 m 时目标速度 = 上限 × (0.4/0.5)，
+ * 即 0.60 时弯里约 0.48 m/s，直道才是 0.60。上限受 BALANCE_SPEED_TARGET_MAX_MPS
+ * （1.0）约束。若弯里开始甩/抖，先考虑把 NAV_TRACKING_SLOW_RADIUS_M 调到 0.75
+ * （弯里降回约 0.32），而不是直接降直道速度。 */
+#define NAV_TRACKING_SPEED_MAX_M_S   0.60f
 #define NAV_TRACKING_SPEED_MIN_M_S   0.15f
 #define NAV_TRACKING_SLOW_RADIUS_M   0.50f
 #define NAV_TRACKING_GOAL_RADIUS_M   0.10f
