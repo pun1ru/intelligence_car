@@ -66,12 +66,17 @@ HISTORY_LENGTH = 600
 # 蓝线积分允许的最大单步间隔：遥测 10 Hz 正常 0.1 s，丢一两帧到 0.3 s 还能接受；
 # 再大就把线断开，而不是拿旧航向补一大段直线。
 TRAJECTORY_MAX_STEP_S = 0.35
+# 蓝线的物理合理性上限：单帧位移、单帧航向跳变、轮速绝对值超过这些就当作坏帧，
+# 丢弃并断线。坏帧（编码器方向抖动、姿态瞬间跳变）会把整条线甩出去。
+TRAJECTORY_MAX_STEP_M = 0.30
+TRAJECTORY_MAX_YAW_STEP_DEG = 45.0
+TRAJECTORY_MAX_SPEED_M_S = 2.0
 # 画图限流：5 Hz 足够看曲线，又能让 poll() 及时读串口（见 display()）
 DRAW_PERIOD_S = 0.2
 TIMEOUT_NOTICE = "Telemetry timeout; protection requested."
 # 显示在窗口标题里。桌面上存在多份仓库副本，靠这个标记一眼看出窗口跑的是哪份
 # 代码：标题里没有这个标记，就说明打开的是旧副本或改动前的旧进程。
-UI_VERSION = "v13-gapbreak"
+UI_VERSION = "v14-guard"
 MODES = ("Button", "Serial", "Calibration")
 STATES = ("Protect", "Balance", "Navigation", "Support")
 CHARTS = (
@@ -165,6 +170,9 @@ class Console(tk.Tk):
         self.trajectory_y = 0.0
         self.last_trajectory_uptime_ms: int | None = None
         self.trajectory_heading_zero_deg: float | None = None
+        self.last_trajectory_yaw_deg: float | None = None
+        # 蓝线被断开（丢帧/坏帧）的次数，用来区分问题出在链路还是坏数据
+        self.trajectory_skips = 0
         # 车端自己算的位姿轨迹点。主机端也有一套用轮速+yaw 积分的推算
         # （trajectory_points），两条曲线画在一起就能看出估计器是否可信。
         self.vehicle_pose_points: deque[tuple[float, float]] = deque(
@@ -322,6 +330,7 @@ class Console(tk.Tk):
             ("target_yaw", "Target yaw", "deg"),
             ("target_pitch", "Target pitch", "deg"),
             ("trajectory", "Trajectory", "m"),
+            ("traj_skips", "Blue-line breaks", ""),
         ))
 
         if Figure is None or FigureCanvasTkAgg is None:
@@ -759,6 +768,20 @@ class Console(tk.Tk):
             self._break_trajectory()
             return
         speed = (frame.left_speed_m_s + frame.right_speed_m_s) * 0.5
+        # 坏帧保护：轮速/航向偶尔会瞬间跳一下（编码器方向抖动、姿态解算瞬态），
+        # 一帧坏数据就能让蓝线甩出去一大段。超出物理可能就丢帧并断线。
+        if not math.isfinite(speed) or abs(speed) > TRAJECTORY_MAX_SPEED_M_S:
+            self._break_trajectory()
+            return
+        yaw_step = 0.0 if self.last_trajectory_yaw_deg is None else abs(
+            wrap_angle_deg(frame.yaw_deg - self.last_trajectory_yaw_deg))
+        self.last_trajectory_yaw_deg = frame.yaw_deg
+        if yaw_step > TRAJECTORY_MAX_YAW_STEP_DEG:
+            self._break_trajectory()
+            return
+        if abs(speed) * dt > TRAJECTORY_MAX_STEP_M:
+            self._break_trajectory()
+            return
         if self.trajectory_heading_zero_deg is None:
             self.trajectory_heading_zero_deg = frame.yaw_deg
         heading = math.radians(
@@ -773,6 +796,9 @@ class Console(tk.Tk):
         """在蓝线里插一个 NaN，让 matplotlib 断开折线（不是连一条假直线）。"""
         if self.trajectory_points and not math.isnan(self.trajectory_points[-1][0]):
             self.trajectory_points.append((float("nan"), float("nan")))
+            self.trajectory_skips += 1
+            if "traj_skips" in self.metrics:
+                self.metrics["traj_skips"].set(str(self.trajectory_skips))
 
     def display_pose(self, frame: NavPoseTelemetry) -> None:
         """接收车端位姿帧：更新读数，并把轨迹点追加给轨迹图。
@@ -822,8 +848,12 @@ class Console(tk.Tk):
         self.trajectory_y = 0.0
         self.last_trajectory_uptime_ms = None
         self.trajectory_heading_zero_deg = None
+        self.last_trajectory_yaw_deg = None
+        self.trajectory_skips = 0
         if "trajectory" in self.metrics:
             self.metrics["trajectory"].set("0.00, 0.00")
+        if "traj_skips" in self.metrics:
+            self.metrics["traj_skips"].set("0")
         self._draw_trajectory()
 
     def _plot_series(self, key: str) -> tuple[list[float], list[float]]:
