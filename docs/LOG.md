@@ -227,3 +227,10 @@
 - 新增位姿复位命令（车端 `SERIAL_COMMAND_POSE_RESET = 0x09`）：`app_serial.c` 收帧校验 → `app_state.c` 置 `pose_reset_requested` 并切保护 → `state_task` 调 `decision_task_request_pose_reset()` → `decision_task` 执行 `app_pose_reset()` + `app_nav_reset()`，下一拍用当前车头重新定原点。只清位置/航向/跟踪进度，**不动陀螺零偏**，所以推车重测不必断电重校准。
 - 上位机：`protocol.py` 加 `POSE_RESET` 与 `pose_reset_frame()`；`main.py` 轨迹页加 `Reset pose (origin here)` 按钮（`Reset trajectory` 只清屏幕）；版本号升到 `v11-posereset`，标题里能一眼确认跑的是新版本。
 - 验证：Keil 全量编译 0 Error / 0 Warning；`upper/test_protocol.py` 6 项通过（新增的复位帧固定字节 `a5 5a 09 00 00 00 00 09` 已断言）。实车待跑。
+
+## 2026-10-19（提速到 0.40 m/s）
+
+- 背景：180° 掉头路径在 0.20 m/s 下效果理想，用户要求提到 0.40 m/s 试探。
+- 变更（**单变量**）：`NAV_TRACKING_SPEED_MAX_M_S` 0.20 → 0.40。前视 0.18、降速半径 0.50、终点半径 0.10 均未动。弯里按曲率自动降速：R=0.4 时目标速度 = 0.40×(0.4/0.5) ≈ 0.32 m/s，直道才是 0.40。
+- 预期与判读：更高速度下前视 0.18 相对"车一秒走的距离"(0.4 m) 偏短，可能出现左右画龙或进弯切更多；若出现，先回 0.30，再考虑把前视距离随速度放大（`L = 0.9×v`）。
+- 验证：Keil 全量编译 0 Error / 0 Warning。实车待跑。

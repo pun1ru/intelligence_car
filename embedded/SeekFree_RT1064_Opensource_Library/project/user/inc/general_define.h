@@ -157,10 +157,11 @@
  * ≥ 2 倍点间距，否则前视点在点与点之间跳变，车会发抖画龙；点加密后间距
  * 0.078 m，0.18 ≈ 2.3 倍，是安全余量。 */
 #define NAV_TRACKING_LOOKAHEAD_M     0.18f
-/* 功能验证阶段的保守值：目的是看清"导航层写得对不对"，不是跑性能。
- * 速度压到 0.20 之后弯里几乎不降速（下限 0.15），轨迹形状就只反映转向环，
- * 更容易判断。确认无误后再逐步往上加（上限受 BALANCE_SPEED_TARGET_MAX_MPS 约束）。 */
-#define NAV_TRACKING_SPEED_MAX_M_S   0.20f
+/* 功能验证阶段先用 0.20；导航层确认无误后（2026-10-19）加到 0.40 试探。
+ * 弯里按曲率自动降速：曲率半径 0.4 m 时目标速度 = 上限 × (0.4/0.5) ≈ 0.32 m/s，
+ * 直道上才是 0.40。上限还受 BALANCE_SPEED_TARGET_MAX_MPS（1.0）约束。
+ * 若出现左右画龙/发抖，先回 0.30，再考虑把前视距离随速度放大。 */
+#define NAV_TRACKING_SPEED_MAX_M_S   0.40f
 #define NAV_TRACKING_SPEED_MIN_M_S   0.15f
 #define NAV_TRACKING_SLOW_RADIUS_M   0.50f
 #define NAV_TRACKING_GOAL_RADIUS_M   0.10f
