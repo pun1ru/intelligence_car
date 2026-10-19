@@ -31,7 +31,7 @@
  * 路径点的疏密会影响"前视点在哪一段"的粒度：点太稀时，前视点会从一个顶点
  * 直接跳到很远的顶点（甚至终点），车就会朝那个点抄近路。pure_pursuit 现在
  * 会在段内插值，但点仍然不宜过稀。前视距离见 general_define.h 的
- * NAV_TRACKING_LOOKAHEAD_TIME_S / MIN / MAX（0.40 m/s 时 0.36 m）。
+ * NAV_TRACKING_LOOKAHEAD_TIME_S / MIN / MAX（0.40 m/s 时 0.22 m）。
  *
  * **比赛前必须用实测锥桶间隙坐标整体替换**，否则车会照着这条假路径走。 */
 #define APP_NAV_PATH_DEFINED 1
