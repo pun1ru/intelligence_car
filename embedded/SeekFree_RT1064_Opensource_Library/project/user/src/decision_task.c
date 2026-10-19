@@ -183,7 +183,7 @@ void decision_task(void *pvParameters)
          * 电机"才需要导航状态（判断在 app_control 里）。这样台架验证可以在保护
          * 状态下手推着车做——电机不工作，零风险，也不需要改任何开关。
          * 位姿不可信时 app_nav_step 自己会把指令标为无效。 */
-        app_nav_step(&nav_state, &pose_state.pose);
+        app_nav_step(&nav_state, &pose_state.pose, dt_s);
 
         /* 不管这一拍算没算，都发布一次：valid 位会告诉上位机数据可不可信 */
         app_pose_snapshot(&pose_state, &snapshot.pose);

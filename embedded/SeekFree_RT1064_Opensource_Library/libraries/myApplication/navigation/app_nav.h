@@ -34,6 +34,12 @@ typedef struct
     pure_pursuit_config_t config;
     app_nav_command_t command;
     uint8_t enabled;
+    /* 终点锁存：一旦判定跑完就一直保持"跑完"，直到 app_nav_reset。
+     * 否则车冲过终点后离最后一点变远，判定又变回"没到"，车会掉头回去追，
+     * 表现为冲过终点后原地打转。 */
+    uint8_t finished_latched;
+    /* 上一拍给出的目标速度，用来算"随速度变化的前视距离"和加速度限幅。 */
+    float last_speed_m_s;
 } app_nav_state_t;
 
 /* 用 general_define.h 里的参数配置跟踪器；默认使能状态取
@@ -47,8 +53,9 @@ uint8_t app_nav_enabled(const app_nav_state_t *state);
 /* 换路径、重新发车时调用，让前视点从头开始。 */
 void app_nav_reset(app_nav_state_t *state);
 
-/* 算一拍。pose 不可信、路径为空或参数非法时只把 active 清 0。 */
-void app_nav_step(app_nav_state_t *state, const app_pose_t *pose);
+/* 算一拍。pose 不可信、路径为空或参数非法时只把 active 清 0。
+ * dt_s 用于速度目标的加速度限幅（decision_task 传真实 tick 差）。 */
+void app_nav_step(app_nav_state_t *state, const app_pose_t *pose, float dt_s);
 
 /* 取最近一次指令快照（拷贝）。 */
 void app_nav_snapshot(const app_nav_state_t *state, app_nav_command_t *command);
