@@ -36,8 +36,10 @@
 #define SEND_POSE_TICKS      (SEND_POSE_PERIOD_MS / SEND_TASK_PERIOD_MS)
 #define SEND_CALIBRATION_TICKS (SEND_CALIBRATION_PERIOD_MS / SEND_TASK_PERIOD_MS)
 
-/* 时隙分配（tick % 25）：0/5/10/15/20 遥测，2/12/22 位姿，4 校准。
- * 三类帧不重叠，保证任意 20 ms 时隙最多只发一帧。 */
+/* 时隙分配（tick % 6）：0/6/12/… 遥测，3/9/15/… 位姿；校准每 50 拍一次（slot 4）。
+ * 三类帧基本不重叠，任意 20 ms 时隙最多只发一帧。校准帧偶尔会和遥测撞在
+ * 同一拍（50 与 6 不是整数倍关系），那一拍按优先级只发遥测，校准值晚 1 s
+ * 更新一次，不影响使用。 */
 
 void send_task(void *pvParameters)
 {
@@ -111,7 +113,7 @@ void send_task(void *pvParameters)
             }
             app_serial_send(&telemetry);
         }
-        else if ((tick % SEND_POSE_TICKS) == 2U)
+        else if ((tick % SEND_POSE_TICKS) == 3U)
         {
             app_serial_pose_t pose_telemetry = {0};
             app_nav_command_t nav;

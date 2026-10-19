@@ -19,15 +19,16 @@
  * 吞吐有限（约 700 B/s）：三帧连发共 94 字节会被丢弃或截断，错开发送后才有余量。
  *
  * 带宽预算（必须留在 700 B/s 以内，否则又会 timeout/丢帧）：
- *   遥测  10 Hz × 52 B = 520 B/s  （姿态与轮速，画曲线用，不能降）
- *   位姿   5 Hz × 25 B = 125 B/s  （轨迹图；2 Hz 时 0.4 m/s 下两点隔 0.2 m，
- *                                   画出来是折线，所以提到 5 Hz，间隔约 8 cm）
- *   校准   1 Hz × 24 B =  24 B/s  （只在 20 s 校准期间有用，1 Hz 足够看数值）
- *                   合计 ≈ 669 B/s
- * 遥测帧的频率不能降：它承载姿态与轮速，调控制环时要靠它看波形。 */
+ *   遥测  8.33 Hz × 52 B = 433 B/s （120 ms；姿态与轮速，画曲线用）
+ *   位姿  8.33 Hz × 25 B = 208 B/s （120 ms；轨迹图，点距 0.6 m/s 时约 7 cm）
+ *   校准   1 Hz   × 24 B =  24 B/s （只在 20 s 校准期间有用）
+ *                    合计 ≈ 665 B/s
+ * 说明：位姿从 5 Hz 提到 8.33 Hz、遥测从 10 Hz 降到 8.33 Hz，是为了在不突破
+ * 带宽上限的前提下让**轨迹**更新更快；两路同频后正好各占一半时隙。
+ * 遥测帧承载姿态与轮速，是调控制环看波形的唯一来源，不宜再降。 */
 #define SEND_TASK_PERIOD_MS 20U
-#define SEND_TELEMETRY_PERIOD_MS 100U
-#define SEND_POSE_PERIOD_MS 200U
+#define SEND_TELEMETRY_PERIOD_MS 120U
+#define SEND_POSE_PERIOD_MS 120U
 #define SEND_CALIBRATION_PERIOD_MS 1000U
 #define DEBUG_TASK_PERIOD_MS 100U
 
