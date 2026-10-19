@@ -227,12 +227,12 @@ void app_nav_step(app_nav_state_t *state, const app_pose_t *pose, float dt_s)
     }
     else
     {
-        /* 终点减速：剩余距离越短，允许的速度越低，到点时自然降到 0。
+        /* 终点减速：允许速度与剩余距离成正比（v ≤ gain × 剩余距离），到点降到 0。
          * 这一步不受 speed_min 的下限约束——那是给弯道用的，停车必须能停。 */
-        speed_limit = sqrtf(2.0f * NAV_TRACKING_END_DECEL_M_S2 *
-                            app_nav_remaining_m(points, count,
-                                                state->pursuer.index,
-                                                pose->x_m, pose->y_m));
+        speed_limit = NAV_TRACKING_END_STOP_GAIN_PER_S *
+                      app_nav_remaining_m(points, count,
+                                          state->pursuer.index,
+                                          pose->x_m, pose->y_m);
         if (speed_limit < state->command.target_speed_m_s)
         {
             state->command.target_speed_m_s = speed_limit;
